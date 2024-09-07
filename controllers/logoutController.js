@@ -10,14 +10,10 @@ const handleLogout = async (req, res) => {
   if (!cookies?.jwt) return res.sendStatus(204); //No Content
 
   const refreshToken = cookies.jwt;
-  console.log("🚀 ~ handleLogout ~ refreshToken:", refreshToken)
+  console.log("🚀 ~ handleLogout ~ refreshToken:", refreshToken);
   // check for user found or not
-  const foundUser =
-  (await Admin.findOne({ refreshToken }).exec()) ??
-  (await Student.findOne({ refreshToken }).exec()) ??
-  (await Supervisor.findOne({ refreshToken }).exec());
-  console.log("🚀 ~ handleLogout ~ foundUser:", foundUser)
-  
+  const foundUser = await Admin.findOne({ refreshToken });
+
   if (!foundUser) {
     res.clearCookie("jwt", {
       httpOnly: true,
@@ -30,7 +26,7 @@ const handleLogout = async (req, res) => {
   //Delete  refreshToken from db
   foundUser.refreshToken = "";
   const result = await foundUser.save();
-  console.log("🚀 ~ handleLogout ~ result:", result)
+  console.log("🚀 ~ handleLogout ~ result:", result);
 
   res.clearCookie("jwt", {
     httpOnly: true,

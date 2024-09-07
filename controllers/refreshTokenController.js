@@ -15,11 +15,7 @@ const handleRefreshToken = async (req, res) => {
     // console.log(refreshToken);
     const refreshToken = cookies.jwt;
     // check for user found or not
-    const foundUser =
-      (await Admin.findOne({ refreshToken }).exec()) ??
-      (await Student.findOne({ refreshToken }).exec()) ??
-      (await Supervisor.findOne({ refreshToken }).exec()) ??
-      (await Evaluator.findOne({ refreshToken }).exec());
+    const foundUser = await Admin.findOne({ refreshToken });
 
     // console.log("foundUser");
     // console.log(foundUser);

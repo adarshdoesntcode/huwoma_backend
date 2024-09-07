@@ -9,7 +9,7 @@ const { createAccessToken } = require("./createSetTokens/createAccessToken");
 
 const passwordReset = async (req, res) => {
   console.log(req.body);
-  const {password } = req.body;
+  const { password } = req.body;
   const authHeader = req.headers.authorization || req.headers.Authorization;
   if (!authHeader?.startsWith("Bearer ")) return res.sendStatus(401); //Unauthorized
 
@@ -25,7 +25,6 @@ const passwordReset = async (req, res) => {
     accessToken,
     process.env.ACCESS_TOKEN_SECRET,
     async (err, decoded) => {
-
       if (err || !decoded.UserInfo.email)
         return res.sendStatus(403).send("Forbidden");
 
@@ -58,9 +57,14 @@ const passwordReset = async (req, res) => {
 
         //when otp is match
         //create access token from refresh token
-        const accessToken = createAccessToken(foundUser,role,process.env.OTP_ACCESS_TOKEN_EXPIRATION_TIME);
+        const accessToken = createAccessToken(
+          foundUser,
+          role,
+          process.env.OTP_ACCESS_TOKEN_EXPIRATION_TIME
+        );
 
-        if (!accessToken) return res.status(400).send("Access Token creation fail");
+        if (!accessToken)
+          return res.status(400).send("Access Token creation fail");
 
         //hash new password
         const newHashedPassword = await bcrypt.hash(password, 10);

@@ -11,7 +11,7 @@ const { setCookie } = require("./createSetTokens/setCookie");
 
 const handleLogin = async (req, res) => {
   try {
-    const { email, password, role } = req.body;
+    const { email, password } = req.body;
 
     if (!email || !password)
       return res.status(400).json({
@@ -20,24 +20,10 @@ const handleLogin = async (req, res) => {
 
     // check for user found or not
     let foundUser;
-    if (role === roleList.Student) {
-      foundUser = await Student.findOne({
-        email: email,
-        role: { $in: [role] },
-      }).exec();
-    } else if (role === roleList.Supervisor) {
-      foundUser = await Supervisor.findOne({
-        email: email,
-        role: { $in: [role] },
-      }).exec();
-    } else if (role === roleList.Admin) {
-      foundUser = await Admin.findOne({
-        email: email,
-        role: { $in: [role] },
-      }).exec();
-    } else {
-      return res.sendStatus(400);
-    }
+
+    foundUser = await Admin.findOne({
+      email: email,
+    }).exec();
 
     if (!foundUser)
       return res.status(401).json({
