@@ -38,16 +38,16 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, "/public")));
 
 //routes middleware
-app.use("/", require("./routes/root"));
+// app.use("/", require("./routes/root"));
 
 app.use("/api/register", require("./routes/register"));
 // app.use("/api/oauth/google", require("./routes/oauth"));
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/refresh", require("./routes/refresh"));
-// app.use("/api/forgotPassword/email", require("./routes/forgotPassword"));
+app.use("/api/forgotPassword/email", require("./routes/forgotPassword"));
 app.use("/api/logout", require("./routes/logout"));
-// app.use("/api/forgotPassword/OTP", require("./routes/matchOTP"));
-// app.use("/api/forgotPassword/password", require("./routes/passwordReset"));
+app.use("/api/forgotPassword/OTP", require("./routes/matchOTP"));
+app.use("/api/forgotPassword/password", require("./routes/passwordReset"));
 
 //excute the swagger docs function
 

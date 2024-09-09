@@ -33,24 +33,10 @@ const matchOTP = async (req, res) => {
       try {
         // check for user found or not
         let foundUser;
-        if (role.includes(roleList.Student)) {
-          foundUser = await Student.findOne({
-            email: currentUserEmail,
-            role: { $in: [role] },
-          }).exec();
-        } else if (role.includes(roleList.Supervisor)) {
-          foundUser = await Supervisor.findOne({
-            email: currentUserEmail,
-            role: { $in: [role] },
-          }).exec();
-        } else if (role.includes(roleList.Admin)) {
-          foundUser = await Admin.findOne({
-            email: currentUserEmail,
-            role: { $in: [role] },
-          }).exec();
-        } else {
-          return res.sendStatus(400);
-        }
+
+        foundUser = await Admin.findOne({
+          email: currentUserEmail,
+        });
 
         if (!foundUser) return res.sendStatus(404);
 

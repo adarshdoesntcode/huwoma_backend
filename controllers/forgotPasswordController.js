@@ -14,30 +14,17 @@ function generateOTP() {
 }
 
 const forgotPassword = async (req, res) => {
-  const { email, role } = req.body;
+  const { email } = req.body;
 
   //check for email and role
-  if (!email || !role) return res.sendStatus(400);
+  if (!email) return res.sendStatus(400);
 
   let foundUser;
-  if (role === roleList.Admin) {
-    foundUser = await Admin.findOne({
-      email: email,
-      role: { $in: [role] },
-    }).exec();
-  } else if (role === roleList.Student) {
-    foundUser = await Student.findOne({
-      email: email,
-      role: { $in: [role] },
-    }).exec();
-  } else if (role === roleList.Supervisor) {
-    foundUser = await Supervisor.findOne({
-      email: email,
-      role: { $in: [role] },
-    }).exec();
-  } else {
-    return res.sendStatus(400);
-  }
+
+  foundUser = await Admin.findOne({
+    email: email,
+  });
+
   //404 status check
   if (!foundUser)
     return res
@@ -54,14 +41,18 @@ const forgotPassword = async (req, res) => {
     const resultUser = await foundUser.save();
 
     //create an access token to send to the client side
-    const accessToken = createAccessToken(foundUser,foundUser.role,process.env.OTP_ACCESS_TOKEN_EXPIRATION_TIME);
+    const accessToken = createAccessToken(
+      foundUser,
+      foundUser.role,
+      process.env.OTP_ACCESS_TOKEN_EXPIRATION_TIME
+    );
 
     // Send the reset token to the user's email
     const transporter = nodemailer.createTransport({
       service: "gmail",
       host: "smtp.ethereal.email",
-      port: 587,
-      secure: false, // Use `true` for port 465, `false` for all other ports
+      port: 465,
+      secure: true, // Use `true` for port 465, `false` for all other ports
       auth: {
         user: process.env.NODEMAILER_USER,
         pass: process.env.NODEMAILER_PASS,
@@ -69,8 +60,8 @@ const forgotPassword = async (req, res) => {
     });
     const mailOptions = {
       from: {
-        name: "Project Phoenix",
-        address: "nikesh.191624@ncit.edu.np",
+        name: "Huwoma",
+        address: "adarshdai@gmail.com",
       },
       to: foundUser.email,
       subject: "Password Reset OTP Code",
