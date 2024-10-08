@@ -72,6 +72,7 @@ const handleLogin = async (req, res) => {
 
       foundUser.password = undefined;
       foundUser.refreshToken = undefined;
+
       //sending accessToken as an response
       return res.status(200).json({
         accessToken,
