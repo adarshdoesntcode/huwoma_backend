@@ -1,7 +1,6 @@
 const roleList = require("../config/roleList");
 const Admin = require("../models/Admin");
-const Student = require("../models/Student");
-const Supervisor = require("../models/Supervisor");
+
 const nodemailer = require("nodemailer");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");

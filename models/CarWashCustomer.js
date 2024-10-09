@@ -3,7 +3,7 @@ const Schema = mongoose.Schema;
 
 const CarWashCustomerSchema = new Schema(
   {
-    cutomerName: {
+    customerName: {
       type: String,
       required: true,
     },
@@ -15,10 +15,12 @@ const CarWashCustomerSchema = new Schema(
     cutomerAddress: {
       type: String,
     },
-    customerTransactions: {
-      type: Schema.Types.ObjectId,
-      ref: "CarWashTransaction",
-    },
+    customerTransactions: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "CarWashTransaction",
+      },
+    ],
   },
   {
     timestamps: true,

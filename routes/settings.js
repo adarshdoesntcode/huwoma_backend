@@ -1,8 +1,8 @@
 const express = require("express");
 const router = express.Router();
-const ROLES_LIST = require("../../config/roleList");
-const verifyRoles = require("../../middleware/verifyRoles");
-const settingsController = require("../../controllers/settingsController");
+const ROLES_LIST = require("../config/roleList");
+const verifyRoles = require("../middleware/verifyRoles");
+const settingsController = require("../controllers/settingsController");
 
 //====================VEHICLE TYPE======================
 

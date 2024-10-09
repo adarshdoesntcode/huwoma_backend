@@ -6,16 +6,17 @@ const adminSchema = new Schema(
   {
     email: {
       type: String,
-      required: [true, "Please your valid email address!"],
+      required: true,
       unique: true,
       lowercase: true,
-      validate: [validator.isEmail, "Please provide a valid email!!!"],
     },
     fullname: {
       type: String,
-      required: [true, "Please, Enter your full name!"],
+      required: true,
     },
-    photo: String,
+    photo: {
+      type: String,
+    },
     phoneNumber: {
       type: String,
     },

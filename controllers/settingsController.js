@@ -2,37 +2,34 @@ const CarWashVehicleType = require("../models/CarWashVehicleType");
 const PackageType = require("../models/PackageType");
 const PaymentMode = require("../models/PaymentMode");
 const ServiceType = require("../models/ServiceType");
+const { errorResponse, successResponse } = require("./utils/reponse");
 
 //====================VEHICLE TYPE======================
 
 const createVehicleType = async (req, res) => {
   try {
-    const { vehicleTypeName, vehicleTypeFor, billAbbreviation, vehicleIcon } =
-      req.body;
+    const { vehicleTypeName, billAbbreviation, vehicleIcon } = req.body;
 
-    if (!vehicleTypeName || !vehicleTypeFor || !billAbbreviation) {
-      return res
-        .status(400)
-        .json({ message: "Please fill all required fields" });
+    if (!vehicleTypeName || !billAbbreviation) {
+      return errorResponse(res, 400, "Please fill all required fields");
     }
 
     const newVehicleType = new CarWashVehicleType({
       vehicleTypeName,
-      vehicleTypeFor,
       billAbbreviation,
       vehicleIcon,
     });
 
     const savedVehicleType = await newVehicleType.save();
 
-    res.status(201).json({
-      message: "Vehicle type created successfully!",
-      vehicleType: savedVehicleType,
-    });
+    return successResponse(
+      res,
+      201,
+      "Vehicle type created successfully!",
+      savedVehicleType
+    );
   } catch (error) {
-    // Handle any error
-    console.error(error);
-    res.status(500).json({ message: "Server error, please try again later." });
+    return errorResponse(res, 500, "Server error", error.message);
   }
 };
 
@@ -290,7 +287,7 @@ const updatePackageType = async (req, res) => {
 
   try {
     const updatedPackageType = await PackageType.findOneAndUpdate(
-      { _id: packageTypeId, serviceTypeOperational: true },
+      { _id: packageTypeId, packageTypeOperational: true },
       updates,
       { new: true, runValidators: true }
     );

@@ -1,10 +1,7 @@
-const Student = require("../models/Student");
 const Admin = require("../models/Admin");
-const Supervisor = require("../models/Supervisor");
 
 const jwt = require("jsonwebtoken");
 const { createAccessToken } = require("./createSetTokens/createAccessToken");
-const Evaluator = require("../models/Evaluator");
 
 const handleRefreshToken = async (req, res) => {
   try {

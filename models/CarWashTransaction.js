@@ -8,42 +8,38 @@ const CarWashTransactionSchema = new Schema(
       ref: "CarWashCustomer",
       required: true,
     },
-    services: [
-      {
-        service: {
-          type: Schema.Types.ObjectId,
-          ref: "ServiceType",
-        },
-        start: {
-          type: Date,
-        },
-        end: {
-          type: Date,
-        },
-        cost: {
-          type: Number,
-          min: 0, // Ensure cost is non-negative
-        },
+    services: {
+      service: {
+        type: Schema.Types.ObjectId,
+        ref: "ServiceType",
       },
-    ],
-    packages: [
-      {
-        package: {
-          type: Schema.Types.ObjectId,
-          ref: "PackageType",
-        },
-        start: {
-          type: Date,
-        },
-        end: {
-          type: Date,
-        },
-        cost: {
-          type: Number,
-          min: 0, // Ensure cost is non-negative
-        },
+      start: {
+        type: Date,
       },
-    ],
+      end: {
+        type: Date,
+      },
+      cost: {
+        type: Number,
+        min: 0,
+      },
+    },
+    packages: {
+      package: {
+        type: Schema.Types.ObjectId,
+        ref: "PackageType",
+      },
+      start: {
+        type: Date,
+      },
+      end: {
+        type: Date,
+      },
+      cost: {
+        type: Number,
+        min: 0,
+      },
+    },
     parking: {
       in: {
         type: Date,
@@ -53,12 +49,12 @@ const CarWashTransactionSchema = new Schema(
       },
       cost: {
         type: Number,
-        min: 0, // Ensure cost is non-negative
+        min: 0,
       },
     },
     transactionStatus: {
       type: String,
-      default: "QUEUE",
+      default: "QUEUED",
     },
     paymentStatus: {
       type: String,
@@ -67,11 +63,9 @@ const CarWashTransactionSchema = new Schema(
     billNo: {
       type: Number,
       min: 0,
-      required: true,
     },
     transactionTime: {
       type: Date,
-      required: true,
     },
     redeemed: {
       type: Boolean,
@@ -81,6 +75,17 @@ const CarWashTransactionSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: "PaymentMode",
     },
+    inspections: [
+      {
+        categoryName: String,
+        items: [
+          {
+            itemName: String,
+            response: Boolean,
+          },
+        ],
+      },
+    ],
     grossAmount: {
       type: Number,
       min: 0,

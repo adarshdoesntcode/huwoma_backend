@@ -1,8 +1,6 @@
-const Student = require("../models/Student");
-const Supervisor = require("../models/Supervisor");
 const Admin = require("../models/Admin");
 const bcrypt = require("bcrypt");
-const Evaluator = require("../models/Evaluator");
+
 const jwt = require("jsonwebtoken");
 const roleList = require("../config/roleList");
 const { createAccessToken } = require("./createSetTokens/createAccessToken");

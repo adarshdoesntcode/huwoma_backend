@@ -1,6 +1,4 @@
-const Student = require("../models/Student");
 const Admin = require("../models/Admin");
-const Supervisor = require("../models/Supervisor");
 
 const handleLogout = async (req, res) => {
   //On client, also delete the access token

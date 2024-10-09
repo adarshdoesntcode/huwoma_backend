@@ -1,9 +1,9 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const roleList = require("../config/roleList");
-const Student = require("../models/Student");
+
 const Admin = require("../models/Admin");
-const Supervisor = require("../models/Supervisor");
+
 require("dotenv").config();
 const { createAccessToken } = require("./createSetTokens/createAccessToken");
 
