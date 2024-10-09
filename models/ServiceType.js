@@ -12,7 +12,6 @@ const ServiceTypeSchema = new Schema(
     },
     serviceTypeOperational: {
       type: Boolean,
-      required: true,
       default: true,
     },
     billAbbreviation: {
@@ -29,10 +28,9 @@ const ServiceTypeSchema = new Schema(
       required: true,
       default: false,
     },
-    packageOnly: {
+    streakApplicable: {
       type: Boolean,
-      required: true,
-      default: false,
+      default: true,
     },
     serviceVehicle: {
       type: Schema.Types.ObjectId,

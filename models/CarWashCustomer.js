@@ -17,7 +17,7 @@ const CarWashCustomerSchema = new Schema(
     },
     customerTransactions: {
       type: Schema.Types.ObjectId,
-      ref: "CarWashTransactions",
+      ref: "CarWashTransaction",
     },
   },
   {

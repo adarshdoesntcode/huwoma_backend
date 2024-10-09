@@ -9,14 +9,24 @@ const PackageTypeSchema = new Schema(
     },
     packageContents: [
       {
-        type: Schema.Types.ObjectId,
-        ref: "ServiceType",
-        required: true,
+        packageServiceName: {
+          type: String,
+          required: true,
+        },
+
+        billAbbreviation: {
+          type: String,
+          required: true,
+        },
+        packageServiceRate: {
+          type: Number,
+          required: true,
+          min: 0,
+        },
       },
     ],
     packageTypeOperational: {
       type: Boolean,
-      required: true,
       default: true,
     },
     billAbbreviation: {
@@ -30,8 +40,11 @@ const PackageTypeSchema = new Schema(
     },
     includeParking: {
       type: Boolean,
-      required: true,
       default: false,
+    },
+    streakApplicable: {
+      type: Boolean,
+      default: true,
     },
     packageVehicle: {
       type: Schema.Types.ObjectId,

@@ -21,10 +21,14 @@ const CarWashVehicleTypeSchema = new Schema(
     ],
     vehicleIcon: {
       type: String,
+      // required: true,
+    },
+    billAbbreviation: {
+      type: String,
+      required: true,
     },
     vehicleTypeOperational: {
       type: Boolean,
-      required: true,
       default: true,
     },
   },
