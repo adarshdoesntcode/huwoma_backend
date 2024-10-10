@@ -1,13 +1,15 @@
+require("dotenv").config();
+const qs = require("qs");
+const { default: axios } = require("axios");
 const Admin = require("../models/Admin");
 const Student = require("../models/Student");
 const Supervisor = require("../models/Supervisor");
 const roleList = require("../config/roleList");
-require("dotenv").config();
-const { getGoogleOAuthTokens } = require("./getGoogleOAuthTokens");
-const { getGoogleUser } = require("./getGoogleUser");
-const { createAccessToken } = require("./createSetTokens/createAccessToken");
-const { createRefreshToken } = require("./createSetTokens/createRefreshToken");
-const { setCookie } = require("./createSetTokens/setCookie");
+const {
+  createAccessToken,
+  createRefreshToken,
+  setCookie,
+} = require("./utils/token");
 const {
   extractRollAndBatch,
 } = require("./utility functions/extractRollAndBatch");
@@ -17,6 +19,43 @@ const {
 const {
   initializeProgressStatus,
 } = require("./utility functions/initializeProgressStatus");
+
+const getGoogleOAuthTokens = async (req, res, code) => {
+  const url = "https://oauth2.googleapis.com/token";
+  const values = {
+    code,
+    client_id: process.env.GOOGLE_CLIENT_ID,
+    client_secret: process.env.GOOGLE_CLIENT_SCERET,
+    redirect_uri: process.env.GOOGLE_OAUTH_REDIRECT_URL,
+    grant_type: "authorization_code",
+  };
+  try {
+    const response = await axios.post(url, qs.stringify(values), {
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+    });
+    return response.data;
+  } catch (err) {
+    console.error(err.message);
+  }
+};
+
+const getGoogleUser = async ({ id_token, access_token }) => {
+  try {
+    const response = await axios.get(
+      `https://www.googleapis.com/oauth2/v1/userinfo?alt=json&access_token=${access_token}`,
+      {
+        headers: {
+          Authorization: `Bearer ${id_token}`,
+        },
+      }
+    );
+    return response.data;
+  } catch (err) {
+    console.error(err.message);
+  }
+};
 
 const updateUserDetails = async (userModel, googleUser, role, refreshToken) => {
   const updatedUser = await userModel.findOneAndUpdate(
@@ -45,31 +84,17 @@ const googleOauthHandler = async (req, res) => {
   try {
     // get the code from qs
     const code = req.query.code;
-    console.log("🚀 ~ googleOauthHandler ~ role:", role)
+
     const origin = req.get("host");
-    console.log("****************************");
-    console.log("🚀 ~ googleOauthHandler ~ origin:", origin);
-    console.log("****************************");
-    console.log("🚀 ~ googleOauthHandler ~ code:", code);
-    // const role = Number(req.query.state);
-    console.log("****************************");
-    // const homePath = req.query;
-    console.log("🚀 ~ googleOauthHandler ~ homePath:", home_path);
-    console.log("****************************");
-    // get id and access token with code
+
     const { id_token, access_token } = await getGoogleOAuthTokens(
       req,
       res,
       code
     );
-    console.log(
-      "🚀 ~ googleOauthHandler ~ id_token, access_token:",
-      id_token,
-      access_token
-    );
 
     const googleUser = await getGoogleUser({ id_token, access_token });
-    console.log("🚀 ~ googleOauthHandler ~ googleUser:", googleUser);
+
     // jwt.decode(id_token);
 
     if (!googleUser.verified_email) {
@@ -166,11 +191,11 @@ const googleOauthHandler = async (req, res) => {
     // saving refreshToken to the cookie
     setCookie(res, refreshToken);
 
-    console.log("🚀 ~ googleOauthHandler ~ home_path:", home_path)
+    console.log("🚀 ~ googleOauthHandler ~ home_path:", home_path);
     // redirect back to client
     res.redirect(`${home_path}/${Number(role)}`);
   } catch (err) {
-    console.log("🚀 ~ googleOauthHandler ~ home_path:", home_path)
+    console.log("🚀 ~ googleOauthHandler ~ home_path:", home_path);
     console.error(err.message);
     return res.redirect(`${home_path}`);
   }

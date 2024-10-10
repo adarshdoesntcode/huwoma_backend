@@ -1,7 +1,7 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const oAuthController = require('../controllers/oAuthController');
+const oAuthController = require("../controllers/oAuthController");
 
-router.get('/',oAuthController.googleOauthHandler);
+router.get("/google", oAuthController.googleOauthHandler);
 
 module.exports = router;

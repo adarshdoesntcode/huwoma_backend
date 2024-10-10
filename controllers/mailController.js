@@ -1,4 +1,5 @@
 const nodemailer = require("nodemailer");
+
 const sendMailToUser = ({
   defenseType,
   evaluatorEmail,
