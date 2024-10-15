@@ -18,7 +18,12 @@ router
     verifyRoles(ROLES_LIST.superAdmin),
     settingsController.deleteVehicleType
   );
-
+router
+  .route("/carwash/vehicletype/:id")
+  .get(
+    verifyRoles(ROLES_LIST.superAdmin),
+    settingsController.getVehicleTypeById
+  );
 //====================SERVICE TYPE======================
 
 router
@@ -27,13 +32,16 @@ router
     verifyRoles(ROLES_LIST.superAdmin),
     settingsController.createServiceType
   )
-  .get(verifyRoles(ROLES_LIST.superAdmin), settingsController.getAllServiceType)
+
   .put(verifyRoles(ROLES_LIST.superAdmin), settingsController.updateServiceType)
   .delete(
     verifyRoles(ROLES_LIST.superAdmin),
     settingsController.deleteServiceType
   );
 
+router
+  .route("/carwash/servicetype/:vehicleTypeId")
+  .get(verifyRoles(ROLES_LIST.superAdmin), settingsController.getServiceType);
 //====================PACKAGE TYPE======================
 
 router
@@ -47,6 +55,23 @@ router
   .delete(
     verifyRoles(ROLES_LIST.superAdmin),
     settingsController.deletePackageType
+  );
+
+//====================INSPECTION======================
+
+router
+  .route("/carwash/inspection")
+  .get(
+    verifyRoles(ROLES_LIST.superAdmin),
+    settingsController.getInspectionTemplate
+  )
+  .post(
+    verifyRoles(ROLES_LIST.superAdmin),
+    settingsController.createInspectionTemplate
+  )
+  .put(
+    verifyRoles(ROLES_LIST.superAdmin),
+    settingsController.updateInspectionTemplate
   );
 
 //====================PAYMENT MODE======================

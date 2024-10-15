@@ -9,10 +9,6 @@ const InspectionTemplateSchema = new Schema(
         items: [
           {
             itemName: { type: String, required: true },
-            itemType: {
-              type: Boolean,
-              default: false,
-            },
           },
         ],
       },

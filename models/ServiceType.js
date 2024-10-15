@@ -25,7 +25,6 @@ const ServiceTypeSchema = new Schema(
     },
     includeParking: {
       type: Boolean,
-      required: true,
       default: false,
     },
     streakApplicable: {

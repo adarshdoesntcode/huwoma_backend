@@ -2,6 +2,7 @@ const CarWashVehicleType = require("../models/CarWashVehicleType");
 const PackageType = require("../models/PackageType");
 const PaymentMode = require("../models/PaymentMode");
 const ServiceType = require("../models/ServiceType");
+const InspectionTemplate = require("../models/InspectionTemplate");
 const { errorResponse, successResponse } = require("./utils/reponse");
 
 //====================VEHICLE TYPE======================
@@ -40,22 +41,54 @@ const getAllVehicleType = async (req, res) => {
     })
       .populate({
         path: "services",
-        match: { serviceTypeOperational: true }, // Only populate operational services
+        match: { serviceTypeOperational: true },
       })
       .populate({
         path: "packages",
-        match: { packageTypeOperational: true }, // Only populate operational packages
+        match: { packageTypeOperational: true },
       });
 
     if (activeVehicleTypes.length === 0) {
-      return res.status(204).send(); // 204 No Content
+      return successResponse(res, 204, "No Content", activeVehicleTypes);
     }
 
-    res.status(200).json(activeVehicleTypes);
-  } catch (err) {
-    console.error(err);
+    return successResponse(
+      res,
+      200,
+      "Active vehicle types with service and package",
+      activeVehicleTypes
+    );
+  } catch (error) {
+    return errorResponse(res, 500, "Server error", error.message);
+  }
+};
 
-    res.status(500).json({ error: "Server error" });
+const getVehicleTypeById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const vehicleType = await CarWashVehicleType.findById(id)
+      .populate({
+        path: "services",
+        match: { serviceTypeOperational: true },
+      })
+      .populate({
+        path: "packages",
+        match: { packageTypeOperational: true },
+      });
+
+    if (!vehicleType) {
+      return successResponse(res, 404, "Vehicle type not found");
+    }
+
+    return successResponse(
+      res,
+      200,
+      "Vehicle type with service and package",
+      vehicleType
+    );
+  } catch (error) {
+    return errorResponse(res, 500, "Server error", error.message);
   }
 };
 
@@ -70,13 +103,18 @@ const updateVehicleType = async (req, res) => {
     );
 
     if (!updatedVehicleType) {
-      return res.status(404).json({ error: "Vehicle type not found" });
+      return errorResponse(res, 404, "Vehicle type not found");
     }
 
-    res.status(200).json(updatedVehicleType);
+    return successResponse(
+      res,
+      200,
+      "Vehicle type updated successfully",
+      updatedVehicleType
+    );
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return errorResponse(res, 500, "Server error", err.message);
   }
 };
 
@@ -91,7 +129,7 @@ const deleteVehicleType = async (req, res) => {
     );
 
     if (!vehicleType) {
-      return res.status(404).json({ error: "Vehicle type not found" });
+      return errorResponse(res, 404, "Vehicle Type not found");
     }
 
     await ServiceType.updateMany(
@@ -99,18 +137,14 @@ const deleteVehicleType = async (req, res) => {
       { serviceTypeOperational: false }
     );
 
-    // await PackageType.updateMany(
-    //   { _id: { $in: vehicleType.packages } },
-    //   { packageTypeOperational: false }
-    // );
+    await PackageType.updateMany(
+      { _id: { $in: vehicleType.packages } },
+      { packageTypeOperational: false }
+    );
 
-    res.status(200).json({
-      message:
-        "Vehicle type and related services/packages deactivated successfully",
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return successResponse(res, 200, "Config deactivated", vehicleType);
+  } catch (error) {
+    return errorResponse(res, 500, "Server error", error.message);
   }
 };
 
@@ -118,80 +152,164 @@ const deleteVehicleType = async (req, res) => {
 
 const createServiceType = async (req, res) => {
   try {
-    const {
-      serviceTypeName,
-      serviceDescription,
-      billAbbreviation,
-      serviceRate,
-      includeParking,
-      vehicleTypeId,
-    } = req.body;
+    const { services, vehicleTypeId } = req.body; // Expecting an array of services
 
     const vehicleType = await CarWashVehicleType.findById(vehicleTypeId);
     if (!vehicleType) {
-      return res.status(404).json({ message: "Vehicle type not found" });
+      return errorResponse(res, 404, "Vehicle type not found");
     }
 
-    const newService = new ServiceType({
-      serviceTypeName,
-      serviceDescription,
-      billAbbreviation,
-      serviceRate,
-      includeParking,
-      serviceVehicle: vehicleTypeId,
-    });
+    const savedServices = [];
 
-    const savedService = await newService.save();
+    // Loop through the array of services
+    for (const service of services) {
+      const {
+        serviceTypeName,
+        serviceDescription,
+        billAbbreviation,
+        serviceRate,
+        includeParking,
+      } = service;
 
-    vehicleType.services.push(savedService._id);
+      const newService = new ServiceType({
+        serviceTypeName,
+        serviceDescription,
+        billAbbreviation,
+        serviceRate,
+        includeParking,
+        serviceVehicle: vehicleTypeId,
+      });
+
+      const savedService = await newService.save();
+      savedServices.push(savedService);
+
+      vehicleType.services.push(savedService._id);
+    }
+
     await vehicleType.save();
 
-    res.status(201).json({
-      message: "Service created and linked to vehicle type successfully",
-      data: savedService,
-    });
+    return successResponse(
+      res,
+      201,
+      "Services created and linked to vehicle type successfully",
+      savedServices
+    );
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    return errorResponse(res, 500, "Server error", error.message);
   }
 };
 
-const getAllServiceType = async (req, res) => {
+const getServiceType = async (req, res) => {
   try {
+    const { vehicleTypeId } = req.params;
+
+    if (!vehicleTypeId) {
+      return errorResponse(res, 400, "Vehicle type ID is required");
+    }
+
+    const vehicleType = await CarWashVehicleType.findById(vehicleTypeId);
+    if (!vehicleType) {
+      return errorResponse(res, 404, "Vehicle type not found");
+    }
+
     const activeServiceTypes = await ServiceType.find({
       serviceTypeOperational: true,
+      serviceVehicle: vehicleTypeId,
     });
 
     if (activeServiceTypes.length === 0) {
-      return res.status(204).send(); // 204 No Content
+      return successResponse(res, 204, "No active service types found", []);
     }
 
-    res.status(200).json(activeServiceTypes);
+    return successResponse(
+      res,
+      200,
+      "Active service types",
+      activeServiceTypes
+    );
   } catch (err) {
     console.error(err);
-
-    res.status(500).json({ error: "Server error" });
+    return errorResponse(res, 500, "Server error", err.message);
   }
 };
 
 const updateServiceType = async (req, res) => {
-  const { serviceTypeId, updates } = req.body;
+  const { vehicleTypeId, services } = req.body;
 
   try {
-    const updatedServiceType = await ServiceType.findOneAndUpdate(
-      { _id: serviceTypeId, serviceTypeOperational: true },
-      updates,
-      { new: true, runValidators: true }
-    );
+    const vehicleType = await CarWashVehicleType.findById(
+      vehicleTypeId
+    ).populate("services");
 
-    if (!updatedServiceType) {
-      return res.status(404).json({ error: "Service Type not found" });
+    if (!vehicleType) {
+      return errorResponse(res, 404, "Vehicle type not found");
     }
 
-    res.status(200).json(updatedServiceType);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
+    const existingServiceIds = vehicleType.services.map((service) =>
+      service._id.toString()
+    );
+    const updatedServiceIds = services
+      .map((service) => service._id)
+      .filter(Boolean);
+
+    const servicesToDeactivate = existingServiceIds.filter(
+      (id) => !updatedServiceIds.includes(id)
+    );
+
+    await ServiceType.updateMany(
+      { _id: { $in: servicesToDeactivate } },
+      { serviceTypeOperational: false }
+    );
+
+    const updatedOrCreatedServices = [];
+
+    for (const service of services) {
+      if (service._id) {
+        const updatedService = await ServiceType.findByIdAndUpdate(
+          service._id,
+          service,
+          {
+            new: true,
+            runValidators: true,
+          }
+        );
+
+        if (!updatedService) {
+          errorResponse(res, 404, "Service not found");
+        }
+        updatedOrCreatedServices.push(updatedService._id.toString());
+      } else {
+        const newService = new ServiceType({
+          ...service,
+          serviceVehicle: vehicleTypeId,
+        });
+        const savedService = await newService.save();
+        updatedOrCreatedServices.push(savedService._id.toString());
+      }
+    }
+
+    const allServiceIds = [
+      ...new Set([
+        ...vehicleType.services.map((s) => s._id.toString()),
+        ...updatedOrCreatedServices,
+      ]),
+    ];
+
+    vehicleType.services = allServiceIds;
+    await vehicleType.save();
+
+    return successResponse(
+      res,
+      200,
+      "Services updated successfully",
+      vehicleType
+    );
+  } catch (error) {
+    if (error.code === 11000) {
+      return errorResponse(res, 409, "Duplicate service entry", error.message);
+    }
+    return errorResponse(res, 500, "Server error", error.message);
   }
 };
 
@@ -329,6 +447,85 @@ const deletePackageType = async (req, res) => {
   }
 };
 
+//====================INSPECTION======================
+const createInspectionTemplate = async (req, res) => {
+  try {
+    const { categories } = req.body;
+
+    if (!categories || !categories.length) {
+      return errorResponse(
+        res,
+        400,
+        "Categories are required to fill the inspection template."
+      );
+    }
+
+    const newInspectionTemplate = new InspectionTemplate({
+      categories,
+    });
+
+    const savedInspectionTemplate = await newInspectionTemplate.save();
+
+    return successResponse(
+      res,
+      201,
+      "Inspection template successfully filled",
+      savedInspectionTemplate
+    );
+  } catch (error) {
+    return errorResponse(res, 500, "Server error", error.message);
+  }
+};
+
+const getInspectionTemplate = async (req, res) => {
+  try {
+    const inspectionTemplates = await InspectionTemplate.find();
+
+    if (!inspectionTemplates || inspectionTemplates.length === 0) {
+      return successResponse(
+        res,
+        204,
+        "No inspection templates found",
+        inspectionTemplates
+      );
+    }
+
+    return successResponse(
+      res,
+      200,
+      "Inspection templates fetched successfully",
+      inspectionTemplates
+    );
+  } catch (error) {
+    return errorResponse(res, 500, "Server error", error.message);
+  }
+};
+
+const updateInspectionTemplate = async (req, res) => {
+  try {
+    const { templateId, categories } = req.body;
+    console.log(templateId, categories);
+    const updatedTemplate = await InspectionTemplate.findByIdAndUpdate(
+      templateId,
+      { categories },
+      { new: true }
+    );
+
+    if (!updatedTemplate) {
+      return errorResponse(res, 404, "Inspection template not found");
+    }
+
+    return successResponse(
+      res,
+      200,
+      "Inspection template updated successfully",
+      updatedTemplate
+    );
+  } catch (error) {
+    console.error(error);
+    return errorResponse(res, 500, "Server error", error.message);
+  }
+};
 //====================PAYMENT MODE======================
 
 const createPaymentMode = async (req, res) => {
@@ -425,16 +622,20 @@ const deletePaymentMode = async (req, res) => {
 module.exports = {
   createVehicleType,
   getAllVehicleType,
+  getVehicleTypeById,
   updateVehicleType,
   deleteVehicleType,
   createServiceType,
-  getAllServiceType,
+  getServiceType,
   updateServiceType,
   deleteServiceType,
   createPackageType,
   getAllPackageType,
   updatePackageType,
   deletePackageType,
+  createInspectionTemplate,
+  getInspectionTemplate,
+  updateInspectionTemplate,
   createPaymentMode,
   getAllPaymentMode,
   updatePaymentMode,

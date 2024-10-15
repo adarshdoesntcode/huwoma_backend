@@ -53,6 +53,7 @@ const handleLogin = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    console.log(email, password);
     if (!email || !password)
       return res.status(400).json({
         message: "Username and password are required to login!",
