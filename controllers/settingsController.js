@@ -168,6 +168,7 @@ const createServiceType = async (req, res) => {
         serviceTypeName,
         serviceDescription,
         billAbbreviation,
+        streakApplicable,
         serviceRate,
         includeParking,
       } = service;
@@ -177,6 +178,7 @@ const createServiceType = async (req, res) => {
         serviceDescription,
         billAbbreviation,
         serviceRate,
+        streakApplicable,
         includeParking,
         serviceVehicle: vehicleTypeId,
       });
@@ -210,6 +212,7 @@ const getServiceType = async (req, res) => {
     }
 
     const vehicleType = await CarWashVehicleType.findById(vehicleTypeId);
+
     if (!vehicleType) {
       return errorResponse(res, 404, "Vehicle type not found");
     }
@@ -217,7 +220,9 @@ const getServiceType = async (req, res) => {
     const activeServiceTypes = await ServiceType.find({
       serviceTypeOperational: true,
       serviceVehicle: vehicleTypeId,
-    });
+    }).select(
+      "-__v -createdAt -updatedAt -serviceVehicle -serviceTypeOperational"
+    );
 
     if (activeServiceTypes.length === 0) {
       return successResponse(res, 204, "No active service types found", []);
@@ -454,10 +459,6 @@ const createInspectionTemplate = async (req, res) => {
   const { inspections } = req.body;
 
   try {
-    if (!Array.isArray(inspections) || inspections.length === 0) {
-      return errorResponse(res, 400, "No inspections provided.");
-    }
-
     const providedIds = inspections.filter((i) => i._id).map((i) => i._id);
 
     const existingInspections = await InspectionTemplate.find();
@@ -681,7 +682,6 @@ module.exports = {
   createInspectionTemplate,
   getInspectionTemplate,
   updateInspectionTemplate,
-
   createPaymentMode,
   getAllPaymentMode,
   updatePaymentMode,

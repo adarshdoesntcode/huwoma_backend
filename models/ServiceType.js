@@ -24,12 +24,22 @@ const ServiceTypeSchema = new Schema(
       min: 0,
     },
     includeParking: {
-      type: Boolean,
-      default: false,
+      decision: {
+        type: Boolean,
+        default: false,
+      },
+      parkingBuffer: {
+        type: Number,
+      },
     },
     streakApplicable: {
-      type: Boolean,
-      default: true,
+      decision: {
+        type: Boolean,
+        default: false,
+      },
+      washCount: {
+        type: Number,
+      },
     },
     serviceVehicle: {
       type: Schema.Types.ObjectId,
