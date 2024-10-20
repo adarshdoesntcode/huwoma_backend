@@ -68,10 +68,23 @@ router
   .post(
     verifyRoles(ROLES_LIST.superAdmin),
     settingsController.createInspectionTemplate
-  )
-  .put(
+  );
+// .put(
+//   verifyRoles(ROLES_LIST.superAdmin),
+//   settingsController.updateInspectionTemplate
+// );
+
+//====================INSPECTION======================
+
+router
+  .route("/configuration")
+  .get(
     verifyRoles(ROLES_LIST.superAdmin),
-    settingsController.updateInspectionTemplate
+    settingsController.getInspectionTemplate
+  )
+  .post(
+    verifyRoles(ROLES_LIST.superAdmin),
+    settingsController.createInspectionTemplate
   );
 
 //====================PAYMENT MODE======================

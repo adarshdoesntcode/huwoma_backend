@@ -4,6 +4,7 @@ const PaymentMode = require("../models/PaymentMode");
 const ServiceType = require("../models/ServiceType");
 const InspectionTemplate = require("../models/InspectionTemplate");
 const { errorResponse, successResponse } = require("./utils/reponse");
+const Configuration = require("../models/Configuration");
 
 //====================VEHICLE TYPE======================
 
@@ -448,38 +449,74 @@ const deletePackageType = async (req, res) => {
 };
 
 //====================INSPECTION======================
-const createInspectionTemplate = async (req, res) => {
-  try {
-    const { categories } = req.body;
 
-    if (!categories || !categories.length) {
-      return errorResponse(
-        res,
-        400,
-        "Categories are required to fill the inspection template."
-      );
+const createInspectionTemplate = async (req, res) => {
+  const { inspections } = req.body;
+
+  try {
+    if (!Array.isArray(inspections) || inspections.length === 0) {
+      return errorResponse(res, 400, "No inspections provided.");
     }
 
-    const newInspectionTemplate = new InspectionTemplate({
-      categories,
-    });
+    const providedIds = inspections.filter((i) => i._id).map((i) => i._id);
 
-    const savedInspectionTemplate = await newInspectionTemplate.save();
+    const existingInspections = await InspectionTemplate.find();
 
-    return successResponse(
-      res,
-      201,
-      "Inspection template successfully filled",
-      savedInspectionTemplate
+    const inspectionsToRemove = existingInspections.filter(
+      (inspection) => !providedIds.includes(inspection._id.toString())
     );
+
+    for (const inspection of inspectionsToRemove) {
+      await InspectionTemplate.findByIdAndDelete(inspection._id);
+    }
+
+    const createdInspections = [];
+    const updatedInspections = [];
+
+    // Process each inspection
+    for (const inspection of inspections) {
+      if (inspection._id) {
+        const updatedInspection = await InspectionTemplate.findByIdAndUpdate(
+          inspection._id,
+          { $set: inspection },
+          { new: true, runValidators: true }
+        );
+
+        if (updatedInspection) {
+          updatedInspections.push(updatedInspection);
+        } else {
+          return errorResponse(
+            res,
+            404,
+            `Inspection with _id ${inspection._id} not found.`
+          );
+        }
+      } else {
+        const newInspection = new InspectionTemplate(inspection);
+        const savedInspection = await newInspection.save();
+        createdInspections.push(savedInspection);
+      }
+    }
+
+    return successResponse(res, 200, "Inspections processed successfully", {
+      ...updatedInspections,
+      ...createdInspections,
+    });
   } catch (error) {
-    return errorResponse(res, 500, "Server error", error.message);
+    return errorResponse(
+      res,
+      500,
+      "Server error. Could not process inspections.",
+      error.message
+    );
   }
 };
 
 const getInspectionTemplate = async (req, res) => {
   try {
-    const inspectionTemplates = await InspectionTemplate.find();
+    const inspectionTemplates = await InspectionTemplate.find().select(
+      "-__v -createdAt -updatedAt"
+    );
 
     if (!inspectionTemplates || inspectionTemplates.length === 0) {
       return successResponse(
@@ -526,13 +563,14 @@ const updateInspectionTemplate = async (req, res) => {
     return errorResponse(res, 500, "Server error", error.message);
   }
 };
+
 //====================PAYMENT MODE======================
 
 const createPaymentMode = async (req, res) => {
   const { paymentModeName, qrCodeData } = req.body;
 
   if (!paymentModeName) {
-    return res.status(400).json({ error: "Payment mode name is required" });
+    return errorResponse(res, 400, "Payment mode name is required");
   }
 
   try {
@@ -543,29 +581,35 @@ const createPaymentMode = async (req, res) => {
 
     const savedPaymentMode = await newPaymentMode.save();
 
-    res.status(201).json(savedPaymentMode);
+    return successResponse(
+      res,
+      201,
+      "Payment mode created successfully",
+      savedPaymentMode
+    );
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return errorResponse(res, 500, "Server error");
   }
 };
 
 const getAllPaymentMode = async (req, res) => {
   try {
-    // Find all payment modes where paymentModeOperational is true
     const activePaymentModes = await PaymentMode.find({
       paymentModeOperational: true,
     });
 
     if (activePaymentModes.length === 0) {
-      return res.status(204).send(); // 204 No Content
+      return successResponse(res, 204, "No active payment modes found");
     }
 
-    // Return the active payment modes
-    res.status(200).json(activePaymentModes);
+    return successResponse(
+      res,
+      200,
+      "Active payment modes fetched successfully",
+      activePaymentModes
+    );
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return errorResponse(res, 500, "Server error", err.message);
   }
 };
 
@@ -573,23 +617,25 @@ const updatePaymentMode = async (req, res) => {
   const { paymentModeId, updates } = req.body;
 
   try {
-    // Find the payment mode by ID and update it
     const updatedPaymentMode = await PaymentMode.findOneAndUpdate(
       { _id: paymentModeId, paymentModeOperational: true },
       updates,
       { new: true, runValidators: true }
     );
 
-    // Check if the payment mode was found and updated
     if (!updatedPaymentMode) {
-      return res.status(404).json({ error: "Payment mode not found" });
+      return errorResponse(res, 404, "Payment mode not found");
     }
 
-    // Return the updated payment mode
-    res.status(200).json(updatedPaymentMode);
+    return successResponse(
+      res,
+      200,
+      "Payment mode updated successfully",
+      updatedPaymentMode
+    );
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return errorResponse(res, 500, "Server error");
   }
 };
 
@@ -599,23 +645,22 @@ const deletePaymentMode = async (req, res) => {
   try {
     const paymentMode = await PaymentMode.findOneAndUpdate(
       { _id: paymentModeId, paymentModeOperational: true },
-      {
-        paymentModeOperational: false,
-      },
+      { paymentModeOperational: false },
       { new: true, runValidators: true }
     );
 
     if (!paymentMode) {
-      return res.status(404).json({ error: "Payment mode not found" });
+      return errorResponse(res, 404, "Payment mode not found");
     }
 
-    res.status(200).json({
-      message: "Payment mode soft deleted successfully",
-      paymentMode,
-    });
+    return successResponse(
+      res,
+      200,
+      "Payment mode soft deleted successfully",
+      paymentMode
+    );
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return errorResponse(res, 500, "Server error");
   }
 };
 
@@ -636,6 +681,7 @@ module.exports = {
   createInspectionTemplate,
   getInspectionTemplate,
   updateInspectionTemplate,
+
   createPaymentMode,
   getAllPaymentMode,
   updatePaymentMode,

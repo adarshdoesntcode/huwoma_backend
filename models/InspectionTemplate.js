@@ -3,14 +3,16 @@ const Schema = mongoose.Schema;
 
 const InspectionTemplateSchema = new Schema(
   {
-    categories: [
+    categoryName: { type: String, required: true },
+    scope: {
+      type: String,
+      enum: ["interior", "exterior"],
+      default: "exterior",
+    },
+    items: [
       {
-        categoryName: { type: String, required: true },
-        items: [
-          {
-            itemName: { type: String, required: true },
-          },
-        ],
+        type: String,
+        required: true,
       },
     ],
   },
