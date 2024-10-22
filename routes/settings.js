@@ -108,4 +108,13 @@ router
     settingsController.deletePaymentMode
   );
 
+//====================POS ACCESS======================
+router
+  .route("/pos-access")
+  .post(verifyRoles(ROLES_LIST.superAdmin), settingsController.createPOSAccess);
+// .delete(
+//   verifyRoles(ROLES_LIST.superAdmin),
+//   settingsController.deletePOSAccess
+// );
+
 module.exports = router;

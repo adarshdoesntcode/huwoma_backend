@@ -46,7 +46,8 @@ const getCustomer = async (req, res) => {
 
     const customer = await CarWashCustomer.findOne({
       customerContact: phoneNumber,
-    }).populate("customerTransactions");
+    });
+    // .populate("customerTransactions");
 
     if (!customer) {
       return errorResponse(res, 404, "Customer not found");

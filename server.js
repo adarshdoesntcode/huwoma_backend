@@ -10,6 +10,7 @@ const corsOptions = require("./config/corsOptions");
 const verifyJWT = require("./middleware/verifyJWT");
 const credentials = require("./middleware/credentials");
 const connectDB = require("./config/dbConn");
+const verifyPOSAccessToken = require("./middleware/verifyPOSAccessToken");
 
 const PORT = process.env.PORT || 3500;
 
@@ -23,14 +24,16 @@ app.use(cookieParser());
 
 // Define routes
 app.use("/", require("./routes/api"));
+
 app.use("/api/auth", require("./routes/auth"));
 // app.use("/api/oauth", require("./routes/oauth"));
 app.use("/api/password-reset/", require("./routes/password-reset"));
+app.use("/api/pos-auth", require("./routes/pos"));
 
-app.use(verifyJWT);
-
-app.use("/api/settings", require("./routes/settings"));
-app.use("/api/carwash", require("./routes/carwash"));
+// app.use(verifyJWT);
+app.use("/api/pos", verifyPOSAccessToken, require("./routes/pos"));
+app.use("/api/settings", verifyJWT, require("./routes/settings"));
+app.use("/api/carwash", verifyJWT, require("./routes/carwash"));
 
 mongoose.connection.once("open", () => {
   console.log("Database Connected ✅");

@@ -4,7 +4,8 @@ const PaymentMode = require("../models/PaymentMode");
 const ServiceType = require("../models/ServiceType");
 const InspectionTemplate = require("../models/InspectionTemplate");
 const { errorResponse, successResponse } = require("./utils/reponse");
-const Configuration = require("../models/Configuration");
+
+const POSAccess = require("../models/POSAccess");
 
 //====================VEHICLE TYPE======================
 
@@ -665,6 +666,41 @@ const deletePaymentMode = async (req, res) => {
   }
 };
 
+//====================POS ACCESS======================
+
+const createPOSAccess = async (req, res) => {
+  try {
+    const { name } = req.body;
+
+    let accessCode;
+    let isUnique = false;
+
+    while (!isUnique) {
+      accessCode = Math.floor(100000 + Math.random() * 900000);
+
+      const existingAccess = await POSAccess.findOne({ accessCode });
+      if (!existingAccess) {
+        isUnique = true;
+      }
+    }
+
+    const newPOSAccess = new POSAccess({
+      name,
+      accessCode,
+    });
+    await newPOSAccess.save();
+
+    return successResponse(
+      res,
+      201,
+      "POS Access created successfully.",
+      newPOSAccess
+    );
+  } catch (err) {
+    return errorResponse(res, 500, "Server error.");
+  }
+};
+
 module.exports = {
   createVehicleType,
   getAllVehicleType,
@@ -686,4 +722,5 @@ module.exports = {
   getAllPaymentMode,
   updatePaymentMode,
   deletePaymentMode,
+  createPOSAccess,
 };

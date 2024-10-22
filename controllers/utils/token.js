@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const POSAccess = require("../../models/POSAccess");
 
 const createAccessToken = (foundUser, role, expirationTime) => {
   try {
@@ -43,4 +44,8 @@ const setCookie = (res, refreshToken) => {
   });
 };
 
-module.exports = { createAccessToken, createRefreshToken, setCookie };
+module.exports = {
+  createAccessToken,
+  createRefreshToken,
+  setCookie,
+};

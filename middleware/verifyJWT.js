@@ -7,18 +7,20 @@ const Admin = require("../models/Admin");
 const verifyJWT = (req, res, next) => {
   const authHeader = req.headers.authorization || req.headers.Authorization;
 
-  if (!authHeader?.startsWith("Bearer ")) return res.sendStatus(401); // Unauthorized
+  if (!authHeader?.startsWith("Bearer ")) return res.sendStatus(401);
 
   const token = authHeader.split(" ")[1];
 
-  // Verify the token
   jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, async (err, decoded) => {
-    if (err) return res.sendStatus(403); // 403 --> Invalid token
+    if (err) return res.sendStatus(403);
 
     let freshUser;
-    const email = decoded.UserInfo.email;
+    const email = decoded.UserInfo?.email;
+    const role = decoded.UserInfo?.role;
 
-    const role = decoded.UserInfo.role;
+    if (!email || !role) {
+      return res.status(400).json({ message: "Invalid token" });
+    }
 
     try {
       if (role.includes(roleList.admin) || role.includes(roleList.superAdmin)) {
@@ -34,7 +36,6 @@ const verifyJWT = (req, res, next) => {
       req.userId = freshUser._id;
       next();
     } catch (error) {
-      console.error(error);
       return res.sendStatus(500); // Internal server error
     }
   });
