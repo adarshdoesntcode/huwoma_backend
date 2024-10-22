@@ -36,3 +36,5 @@ mongoose.connection.once("open", () => {
   console.log("Database Connected ✅");
   app.listen(PORT, () => console.log(`Server Running on Port : ${PORT} 🚀🚀`));
 });
+
+module.exports = app;
