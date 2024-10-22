@@ -109,12 +109,17 @@ router
   );
 
 //====================POS ACCESS======================
+
 router
   .route("/pos-access")
+  .get(verifyRoles(ROLES_LIST.superAdmin), settingsController.getAllPOSAccess)
   .post(verifyRoles(ROLES_LIST.superAdmin), settingsController.createPOSAccess);
-// .delete(
-//   verifyRoles(ROLES_LIST.superAdmin),
-//   settingsController.deletePOSAccess
-// );
+
+router
+  .route("/pos-access/:id")
+  .delete(
+    verifyRoles(ROLES_LIST.superAdmin),
+    settingsController.deletePOSAccess
+  );
 
 module.exports = router;

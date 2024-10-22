@@ -701,6 +701,41 @@ const createPOSAccess = async (req, res) => {
   }
 };
 
+const getAllPOSAccess = async (req, res) => {
+  try {
+    const posAccessList = await POSAccess.find({});
+
+    if (posAccessList.length === 0) {
+      return successResponse(res, 204, "No Content");
+    }
+
+    return successResponse(
+      res,
+      200,
+      "POS Access list retrieved successfully.",
+      posAccessList
+    );
+  } catch (err) {
+    return errorResponse(res, 500, "Failed to retrieve POS Access list.");
+  }
+};
+
+const deletePOSAccess = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const posAccess = await POSAccess.findById(id);
+    if (!posAccess) {
+      return errorResponse(res, 404, "POS Access not found.");
+    }
+
+    await POSAccess.deleteOne({ _id: id });
+    return successResponse(res, 200, "POS Access deleted successfully.");
+  } catch (err) {
+    return errorResponse(res, 500, "Failed to delete POS Access.");
+  }
+};
+
 module.exports = {
   createVehicleType,
   getAllVehicleType,
@@ -723,4 +758,6 @@ module.exports = {
   updatePaymentMode,
   deletePaymentMode,
   createPOSAccess,
+  getAllPOSAccess,
+  deletePOSAccess,
 };
