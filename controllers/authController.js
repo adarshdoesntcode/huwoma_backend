@@ -7,6 +7,7 @@ const {
   createRefreshToken,
   setCookie,
 } = require("./utils/token");
+const { errorResponse, successResponse } = require("./utils/reponse");
 
 const handleNewAdmin = async (req, res) => {
   const { fullname, email, phoneNumber, role } = req.body;
@@ -194,9 +195,65 @@ const handleRefreshToken = async (req, res) => {
   }
 };
 
+const updateAdminProfile = async (req, res) => {
+  const { id } = req.params;
+  const { fullname, currentPassword, newPassword, confirmPassword } = req.body;
+
+  try {
+    const admin = await Admin.findById(id);
+
+    if (!admin) {
+      return errorResponse(res, 404, "Admin not found");
+    }
+
+    if (fullname) {
+      admin.fullname = fullname;
+      await admin.save();
+      const { password, refreshToken, ...adminData } = admin.toObject();
+      return successResponse(
+        res,
+        200,
+        "Fullname updated successfully",
+        adminData
+      );
+    }
+
+    if (currentPassword && newPassword && confirmPassword) {
+      const isPasswordCorrect = await bcrypt.compare(
+        currentPassword,
+        admin.password
+      );
+
+      if (!isPasswordCorrect) {
+        return errorResponse(res, 401, "Current password is incorrect");
+      }
+
+      if (newPassword !== confirmPassword) {
+        return errorResponse(
+          res,
+          400,
+          "New password and confirm password do not match"
+        );
+      }
+
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      admin.password = hashedPassword;
+      await admin.save();
+
+      return successResponse(res, 200, "Password updated successfully");
+    }
+
+    return errorResponse(res, 400, "Invalid request data");
+  } catch (error) {
+    console.error(error);
+    return errorResponse(res, 500, "Server error", error.message);
+  }
+};
+
 module.exports = {
   handleNewAdmin,
   handleLogin,
   handleLogout,
   handleRefreshToken,
+  updateAdminProfile,
 };

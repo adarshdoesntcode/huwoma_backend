@@ -3,6 +3,12 @@ const router = express.Router();
 const ROLES_LIST = require("../config/roleList");
 const verifyRoles = require("../middleware/verifyRoles");
 const settingsController = require("../controllers/settingsController");
+const authController = require("../controllers/authController");
+
+//====================GENERAL======================
+router
+  .route("/general/:id")
+  .put(verifyRoles(ROLES_LIST.superAdmin), authController.updateAdminProfile);
 
 //====================VEHICLE TYPE======================
 

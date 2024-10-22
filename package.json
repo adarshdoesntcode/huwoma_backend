@@ -18,8 +18,8 @@
     "uuid": "^9.0.1"
   },
   "scripts": {
-    "start": "node server",
-    "dev": "nodemon server"
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
   "name": "backend",
   "version": "1.0.0",
