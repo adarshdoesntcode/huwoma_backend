@@ -10,7 +10,7 @@ router.post("/login", posController.posLogin);
 router
   .route("/carwash/customer")
   .post(carWashController.createCustomer)
-  .get(carWashController.getCustomer);
+  .post(carWashController.findCustomer);
 
 // ====================TRANSACTION=============================
 

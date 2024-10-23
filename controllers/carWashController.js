@@ -5,7 +5,7 @@ const { errorResponse, successResponse } = require("./utils/reponse");
 
 const createCustomer = async (req, res) => {
   try {
-    const { customerName, customerContact, customerAddress } = req.body;
+    const { customerName, customerContact } = req.body;
 
     if (!customerName || !customerContact) {
       return errorResponse(res, 400, "Please fill all required fields");
@@ -24,7 +24,6 @@ const createCustomer = async (req, res) => {
     const newCustomer = new CarWashCustomer({
       customerName,
       customerContact,
-      customerAddress: customerAddress,
     });
 
     await newCustomer.save();
@@ -40,12 +39,12 @@ const createCustomer = async (req, res) => {
   }
 };
 
-const getCustomer = async (req, res) => {
+const findCustomer = async (req, res) => {
   try {
-    const { phoneNumber } = req.body;
+    const { customerContact } = req.body;
 
     const customer = await CarWashCustomer.findOne({
-      customerContact: phoneNumber,
+      customerContact,
     });
     // .populate("customerTransactions");
 
@@ -66,4 +65,4 @@ const getCustomer = async (req, res) => {
 
 // ====================TRANSACTION=============================
 
-module.exports = { createCustomer, getCustomer };
+module.exports = { createCustomer, findCustomer };

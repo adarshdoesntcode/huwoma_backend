@@ -8,8 +8,16 @@ const router = express.Router();
 //====================CUSTOMER======================
 
 router
-  .route("/customer")
-  .post(verifyRoles(ROLES_LIST.superAdmin), carWashController.createCustomer)
-  .get(verifyRoles(ROLES_LIST.superAdmin), carWashController.getCustomer);
+  .route("/customer/find")
+  .post(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    carWashController.findCustomer
+  );
+router
+  .route("/customer/new")
+  .post(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    carWashController.createCustomer
+  );
 
 module.exports = router;

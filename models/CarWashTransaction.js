@@ -8,8 +8,8 @@ const CarWashTransactionSchema = new Schema(
       ref: "CarWashCustomer",
       required: true,
     },
-    services: {
-      service: {
+    service: {
+      id: {
         type: Schema.Types.ObjectId,
         ref: "ServiceType",
       },
