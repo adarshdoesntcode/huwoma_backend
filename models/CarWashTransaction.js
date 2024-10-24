@@ -24,22 +24,6 @@ const CarWashTransactionSchema = new Schema(
         min: 0,
       },
     },
-    packages: {
-      package: {
-        type: Schema.Types.ObjectId,
-        ref: "PackageType",
-      },
-      start: {
-        type: Date,
-      },
-      end: {
-        type: Date,
-      },
-      cost: {
-        type: Number,
-        min: 0,
-      },
-    },
     parking: {
       in: {
         type: Date,
@@ -54,15 +38,22 @@ const CarWashTransactionSchema = new Schema(
     },
     transactionStatus: {
       type: String,
-      default: "QUEUED",
+      enum: [
+        "Booked",
+        "In Queue",
+        "Ready for Pickup",
+        "Completed",
+        "Cancelled",
+      ],
+      default: "In Queue",
     },
     paymentStatus: {
       type: String,
-      default: "PENDING",
+      enum: ["Pending", "Paid"],
+      default: "Pending",
     },
     billNo: {
-      type: Number,
-      min: 0,
+      type: String,
     },
     transactionTime: {
       type: Date,
@@ -99,9 +90,6 @@ const CarWashTransactionSchema = new Schema(
       min: 0,
     },
     vehicleNumber: {
-      type: Number,
-    },
-    vehicleModel: {
       type: String,
     },
   },
