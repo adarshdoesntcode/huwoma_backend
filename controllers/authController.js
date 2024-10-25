@@ -53,6 +53,8 @@ const handleNewAdmin = async (req, res) => {
 const handleLogin = async (req, res) => {
   try {
     const { email, password } = req.body;
+    console.log("🚀 ~ handleLogin ~ password:", password);
+    console.log("🚀 ~ handleLogin ~ email:", email);
 
     if (!email || !password)
       return res.status(400).json({
