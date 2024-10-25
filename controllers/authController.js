@@ -53,8 +53,6 @@ const handleNewAdmin = async (req, res) => {
 const handleLogin = async (req, res) => {
   try {
     const { email, password } = req.body;
-    console.log("🚀 ~ handleLogin ~ password:", password);
-    console.log("🚀 ~ handleLogin ~ email:", email);
 
     if (!email || !password)
       return res.status(400).json({
@@ -69,7 +67,7 @@ const handleLogin = async (req, res) => {
 
     if (!foundUser)
       return res.status(401).json({
-        message: "Unauthorized User", //401 ---> Unauthorized user
+        message: "Unauthorized User",
       });
 
     let match;
@@ -78,7 +76,7 @@ const handleLogin = async (req, res) => {
     } catch (err) {
       console.error(`error-message: ${err.message}`);
       return res.status(401).json({
-        message: "Unauthorized User", //401 ---> Unauthorized user
+        message: "Unauthorized User",
       });
     }
 
@@ -117,7 +115,7 @@ const handleLogin = async (req, res) => {
       });
     } else {
       return res.status(401).json({
-        message: "Unauthorized User", //401 ---> Unauthorized user
+        message: "Unauthorized User",
       });
     }
   } catch (err) {
