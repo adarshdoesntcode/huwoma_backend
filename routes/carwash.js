@@ -22,6 +22,17 @@ router
 
 //====================TRANSACTION======================
 router
+  .route("/transaction/:id")
+  .get(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    carWashController.getTransactionForInspection
+  )
+  .delete(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    carWashController.deleteTransaction
+  );
+
+router
   .route("/transactions")
   .get(
     verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
@@ -33,6 +44,12 @@ router
   .post(
     verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
     carWashController.transactionOne
+  );
+router
+  .route("/transaction/2")
+  .post(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    carWashController.transactionTwo
   );
 
 module.exports = router;

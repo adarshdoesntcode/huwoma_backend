@@ -49,7 +49,7 @@ const CarWashTransactionSchema = new Schema(
     },
     paymentStatus: {
       type: String,
-      enum: ["Pending", "Paid"],
+      enum: ["Pending", "Paid", "Cancelled"],
       default: "Pending",
     },
     billNo: {

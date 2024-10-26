@@ -1,5 +1,6 @@
 const CarWashCustomer = require("../models/CarWashCustomer");
 const CarWashTransaction = require("../models/CarWashTransaction");
+const InspectionTemplate = require("../models/InspectionTemplate");
 const { errorResponse, successResponse } = require("./utils/reponse");
 
 // ======================CUSTOMER=============================
@@ -117,7 +118,14 @@ const getCarwashTransactions = async (req, res) => {
 
 const transactionOne = async (req, res) => {
   try {
-    const { service, billNo, vehicleNumber, customer } = req.body;
+    const {
+      service,
+      billNo,
+      vehicleNumber,
+      customer,
+      serviceStart,
+      serviceRate,
+    } = req.body;
 
     const existingCustomer = await CarWashCustomer.findById(customer);
     if (!existingCustomer) {
@@ -126,8 +134,11 @@ const transactionOne = async (req, res) => {
 
     const newTransaction = new CarWashTransaction({
       customer: customer,
+      transactionStatus: "In Queue",
       service: {
         id: service,
+        start: serviceStart,
+        cost: serviceRate,
       },
       billNo,
       vehicleNumber: vehicleNumber,
@@ -154,9 +165,116 @@ const transactionOne = async (req, res) => {
   }
 };
 
+const transactionTwo = async (req, res) => {
+  try {
+    const { transactionId, inspections, serviceEnd } = req.body;
+
+    const transaction = await CarWashTransaction.findById(transactionId);
+    if (!transaction) {
+      return errorResponse(res, 404, "Transaction not found.");
+    }
+
+    transaction.transactionStatus = "Ready for Pickup";
+    transaction.service.end = serviceEnd;
+    transaction.inspections = inspections;
+
+    await transaction.save();
+
+    return successResponse(
+      res,
+      200,
+      "Transaction updated successfully.",
+      transaction
+    );
+  } catch (err) {
+    console.error(err);
+    return errorResponse(res, 500, "Failed to update transaction.");
+  }
+};
+
+const getTransactionForInspection = async (req, res) => {
+  try {
+    const transactionId = req.params.id;
+
+    const transaction = await CarWashTransaction.findById(transactionId)
+      .populate({
+        path: "service.id",
+        populate: {
+          path: "serviceVehicle",
+        },
+      })
+      .populate("customer");
+
+    if (!transaction) {
+      return errorResponse(res, 404, "Transaction not found.");
+    }
+
+    const inspectionTemplates = await InspectionTemplate.find().select(
+      "-__v -createdAt -updatedAt"
+    );
+
+    return successResponse(
+      res,
+      200,
+      "Transaction and inspection templates retrieved successfully.",
+      {
+        transaction,
+        inspectionTemplates,
+      }
+    );
+  } catch (err) {
+    return errorResponse(
+      res,
+      500,
+      "Server error. Failed to retrieve transaction."
+    );
+  }
+};
+
+const deleteTransaction = async (req, res) => {
+  try {
+    const transactionId = req.params.id;
+
+    const transaction = await CarWashTransaction.findOneAndUpdate(
+      {
+        _id: transactionId,
+        transactionStatus: "In Queue",
+        paymentStatus: "Pending",
+      },
+      {
+        transactionStatus: "Cancelled",
+        paymentStatus: "Cancelled",
+      },
+      {
+        new: true,
+      }
+    );
+
+    if (!transaction) {
+      return errorResponse(res, 404, "Transaction not found.");
+    }
+
+    return successResponse(
+      res,
+      200,
+      "Transaction cancelled successfully.",
+      transaction
+    );
+  } catch (err) {
+    return errorResponse(
+      res,
+      500,
+      "Server error. Failed to cancel transaction."
+    );
+  }
+};
+
 module.exports = {
   createCustomer,
   findCustomer,
   transactionOne,
+  transactionTwo,
   getCarwashTransactions,
+  getTransactionForInspection,
+  deleteTransaction,
 };
