@@ -1,6 +1,8 @@
 const CarWashCustomer = require("../models/CarWashCustomer");
 const CarWashTransaction = require("../models/CarWashTransaction");
+const CarWashVehicleType = require("../models/CarWashVehicleType");
 const InspectionTemplate = require("../models/InspectionTemplate");
+const PaymentMode = require("../models/PaymentMode");
 const { errorResponse, successResponse } = require("./utils/reponse");
 
 // ======================CUSTOMER=============================
@@ -103,7 +105,8 @@ const getCarwashTransactions = async (req, res) => {
           path: "serviceVehicle",
         },
       })
-      .populate("customer");
+      .populate("customer")
+      .populate("paymentMode");
 
     return successResponse(
       res,
@@ -192,6 +195,161 @@ const transactionTwo = async (req, res) => {
   }
 };
 
+const transactionThree = async (req, res) => {
+  try {
+    const {
+      transactionId,
+      serviceId,
+      transactionStatus,
+      paymentStatus,
+      paymentMode,
+      parkingIn,
+      parkingOut,
+      parkingCost,
+      transactionTime,
+      grossAmount,
+      discountAmount,
+      netAmount,
+      redeemed,
+      washCount,
+    } = req.body;
+
+    if (!transactionId) {
+      return errorResponse(res, 400, "Transaction ID is required.");
+    }
+
+    if (!paymentMode) {
+      return errorResponse(res, 400, "Payment mode is required.");
+    }
+
+    if (redeemed && !washCount) {
+      return errorResponse(
+        res,
+        400,
+        "Wash count is required when redeemed is true."
+      );
+    }
+
+    const transaction = await CarWashTransaction.findByIdAndUpdate(
+      transactionId,
+      {
+        transactionStatus,
+        paymentStatus,
+        paymentMode,
+        parking: {
+          in: parkingIn,
+          out: parkingOut,
+          cost: parkingCost,
+        },
+        transactionTime,
+        grossAmount,
+        discountAmount,
+        netAmount,
+        redeemed,
+      },
+      { new: true }
+    );
+
+    if (!transaction) {
+      return errorResponse(res, 404, "Transaction not found.");
+    }
+
+    const paymentModeObj = await PaymentMode.findByIdAndUpdate(paymentMode, {
+      $push: {
+        carWashTransactions: transactionId,
+      },
+    });
+
+    if (redeemed && washCount) {
+      const updatedTransactions = await CarWashTransaction.updateMany(
+        {
+          paymentStatus: "Paid",
+          transactionStatus: "Completed",
+          "service.id": serviceId,
+        },
+        {
+          $set: {
+            redeemed: true,
+          },
+        },
+        {
+          sort: {
+            createdAt: 1,
+          },
+          limit: washCount,
+        }
+      );
+    }
+
+    return successResponse(
+      res,
+      200,
+      "Transaction updated successfully.",
+      transaction
+    );
+  } catch (err) {
+    console.error(err);
+    return errorResponse(res, 500, "Failed to update transaction.");
+  }
+};
+
+const getCheckoutDetails = async (req, res) => {
+  try {
+    const customerId = req.params.customerId;
+
+    const customer = await CarWashCustomer.findById(customerId).populate({
+      path: "customerTransactions",
+      match: {
+        transactionStatus: "Completed",
+        paymentStatus: "Paid",
+        redeemed: false,
+      },
+      populate: {
+        path: "service.id",
+        match: {
+          "streakApplicable.decision": true,
+          serviceTypeOperational: true,
+        },
+        populate: {
+          path: "serviceVehicle",
+        },
+      },
+    });
+    if (!customer) {
+      return errorResponse(res, 404, "Customer not found.");
+    }
+
+    customer.customerTransactions = customer.customerTransactions.filter(
+      (transaction) => transaction.service.id
+    );
+
+    // const vehicleTypes = await CarWashVehicleType.find({
+    //   vehicleTypeOperational: true,
+    // }).populate({
+    //   path: "services",
+    //   match: { "streakApplicable.decision": true },
+    // });
+
+    const paymentModes = await PaymentMode.find({
+      paymentModeOperational: true,
+    });
+
+    return successResponse(
+      res,
+      200,
+      "Checkout details retrieved successfully.",
+      {
+        customer,
+
+        paymentModes,
+      }
+    );
+  } catch (err) {
+    console.error(err);
+    return errorResponse(res, 500, "Failed to get checkout details.");
+  }
+};
+
 const getTransactionForInspection = async (req, res) => {
   try {
     const transactionId = req.params.id;
@@ -274,7 +432,9 @@ module.exports = {
   findCustomer,
   transactionOne,
   transactionTwo,
+  transactionThree,
   getCarwashTransactions,
   getTransactionForInspection,
   deleteTransaction,
+  getCheckoutDetails,
 };

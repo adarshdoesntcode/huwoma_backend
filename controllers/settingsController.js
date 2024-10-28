@@ -154,7 +154,7 @@ const deleteVehicleType = async (req, res) => {
 
 const createServiceType = async (req, res) => {
   try {
-    const { services, vehicleTypeId } = req.body; // Expecting an array of services
+    const { services, vehicleTypeId } = req.body;
 
     const vehicleType = await CarWashVehicleType.findById(vehicleTypeId);
     if (!vehicleType) {
@@ -163,7 +163,6 @@ const createServiceType = async (req, res) => {
 
     const savedServices = [];
 
-    // Loop through the array of services
     for (const service of services) {
       const {
         serviceTypeName,

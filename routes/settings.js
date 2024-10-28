@@ -102,10 +102,16 @@ router
     settingsController.createPaymentMode
   )
   .get(verifyRoles(ROLES_LIST.superAdmin), settingsController.getAllPaymentMode)
-  .put(verifyRoles(ROLES_LIST.superAdmin), settingsController.updatePaymentMode)
   .delete(
     verifyRoles(ROLES_LIST.superAdmin),
     settingsController.deletePaymentMode
+  );
+
+router
+  .route("/paymentmode/:id")
+  .put(
+    verifyRoles(ROLES_LIST.superAdmin),
+    settingsController.updatePaymentMode
   );
 
 //====================POS ACCESS======================

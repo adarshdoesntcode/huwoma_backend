@@ -33,6 +33,13 @@ router
   );
 
 router
+  .route("/checkoutdetails/:customerId")
+  .get(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    carWashController.getCheckoutDetails
+  );
+
+router
   .route("/transactions")
   .get(
     verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
@@ -50,6 +57,13 @@ router
   .post(
     verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
     carWashController.transactionTwo
+  );
+
+router
+  .route("/transaction/3")
+  .post(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    carWashController.transactionThree
   );
 
 module.exports = router;
