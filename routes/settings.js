@@ -105,10 +105,7 @@ router
   .delete(
     verifyRoles(ROLES_LIST.superAdmin),
     settingsController.deletePaymentMode
-  );
-
-router
-  .route("/paymentmode/:id")
+  )
   .put(
     verifyRoles(ROLES_LIST.superAdmin),
     settingsController.updatePaymentMode
