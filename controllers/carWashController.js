@@ -1,3 +1,4 @@
+const { trusted } = require("mongoose");
 const CarWashCustomer = require("../models/CarWashCustomer");
 const CarWashTransaction = require("../models/CarWashTransaction");
 const CarWashVehicleType = require("../models/CarWashVehicleType");
@@ -49,7 +50,14 @@ const findCustomer = async (req, res) => {
 
     const customer = await CarWashCustomer.findOne({
       customerContact,
-    }).populate("customerTransactions");
+    }).populate({
+      path: "customerTransactions",
+      match: {
+        transactionStatus: "Completed",
+        paymentStatus: "Paid",
+        redeemed: false,
+      },
+    });
 
     if (!customer) {
       return errorResponse(res, 404, "Customer not found");
@@ -85,7 +93,8 @@ const getCarwashTransactions = async (req, res) => {
     const transactions = await CarWashTransaction.find({
       $or: [
         { createdAt: { $gte: startOfDay, $lt: endOfDay } },
-
+        { transactionTime: { $gte: startOfDay, $lt: endOfDay } },
+        { "service.end": { $gte: startOfDay, $lt: endOfDay } },
         {
           $or: [
             {
