@@ -1,4 +1,3 @@
-const { trusted } = require("mongoose");
 const CarWashCustomer = require("../models/CarWashCustomer");
 const CarWashTransaction = require("../models/CarWashTransaction");
 const CarWashVehicleType = require("../models/CarWashVehicleType");
@@ -91,18 +90,18 @@ const getCarwashTransactions = async (req, res) => {
     endOfDay.setHours(23, 59, 59, 999);
 
     const transactions = await CarWashTransaction.find({
-      $or: [
-        { createdAt: { $gte: startOfDay, $lt: endOfDay } },
-        { transactionTime: { $gte: startOfDay, $lt: endOfDay } },
-        { "service.end": { $gte: startOfDay, $lt: endOfDay } },
+      $and: [
         {
           $or: [
-            {
-              transactionStatus: {
-                $in: ["Booked", "In Queue", "Ready for Pickup"],
-              },
-            },
-            { paymentStatus: "Pending" },
+            { createdAt: { $gte: startOfDay, $lt: endOfDay } },
+            { transactionTime: { $gte: startOfDay, $lt: endOfDay } },
+            { "service.end": { $gte: startOfDay, $lt: endOfDay } },
+          ],
+        },
+        {
+          $nor: [
+            { transactionStatus: "Cancelled" },
+            { paymentStatus: "Cancelled" },
           ],
         },
       ],
@@ -138,6 +137,29 @@ const transactionOne = async (req, res) => {
       serviceStart,
       serviceRate,
     } = req.body;
+
+    const existingTransaction = await CarWashTransaction.findOne({
+      "service.id": service,
+      vehicleNumber,
+      transactionStatus: {
+        $not: {
+          $in: ["Completed", "Cancelled"],
+        },
+      },
+      paymentStatus: {
+        $not: {
+          $in: ["Paid", "Cancelled"],
+        },
+      },
+    });
+
+    if (existingTransaction) {
+      return errorResponse(
+        res,
+        400,
+        "There is already an active transaction for this service and vehicle number"
+      );
+    }
 
     const existingCustomer = await CarWashCustomer.findById(customer);
     if (!existingCustomer) {
