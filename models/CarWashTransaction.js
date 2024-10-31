@@ -62,6 +62,17 @@ const CarWashTransactionSchema = new Schema(
       type: Boolean,
       default: false,
     },
+    bookingDeadline: {
+      type: Date,
+    },
+    deleteAt: {
+      type: Date,
+      default: function () {
+        return this.bookingDeadline
+          ? new Date(this.bookingDeadline.getTime() + 15 * 60000)
+          : undefined;
+      },
+    },
     paymentMode: {
       type: Schema.Types.ObjectId,
       ref: "PaymentMode",
@@ -97,5 +108,6 @@ const CarWashTransactionSchema = new Schema(
     timestamps: true,
   }
 );
+CarWashTransactionSchema.index({ deleteAt: 1 }, { expireAfterSeconds: 0 });
 
 module.exports = mongoose.model("CarWashTransaction", CarWashTransactionSchema);

@@ -66,4 +66,15 @@ router
     carWashController.transactionThree
   );
 
+router
+  .route("/transaction/booking")
+  .post(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    carWashController.createNewBookingTransaction
+  )
+  .put(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    carWashController.transactionStartFromBooking
+  );
+
 module.exports = router;

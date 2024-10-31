@@ -1,9 +1,11 @@
+const { ca } = require("date-fns/locale");
 const CarWashCustomer = require("../models/CarWashCustomer");
 const CarWashTransaction = require("../models/CarWashTransaction");
 const CarWashVehicleType = require("../models/CarWashVehicleType");
 const InspectionTemplate = require("../models/InspectionTemplate");
 const PaymentMode = require("../models/PaymentMode");
 const { errorResponse, successResponse } = require("./utils/reponse");
+const { generateBillNo } = require("./utils/utils");
 
 // ======================CUSTOMER=============================
 
@@ -90,7 +92,7 @@ const getCarwashTransactions = async (req, res) => {
     endOfDay.setHours(23, 59, 59, 999);
 
     const transactions = await CarWashTransaction.find({
-      $and: [
+      $or: [
         {
           $or: [
             { createdAt: { $gte: startOfDay, $lt: endOfDay } },
@@ -99,9 +101,13 @@ const getCarwashTransactions = async (req, res) => {
           ],
         },
         {
-          $nor: [
-            { transactionStatus: "Cancelled" },
-            { paymentStatus: "Cancelled" },
+          $or: [
+            {
+              transactionStatus: {
+                $in: ["Booked", "In Queue", "Ready for Pickup"],
+              },
+            },
+            { paymentStatus: "Pending" },
           ],
         },
       ],
@@ -114,6 +120,17 @@ const getCarwashTransactions = async (req, res) => {
         },
       })
       .populate("customer")
+      .populate({
+        path: "customer",
+        populate: {
+          path: "customerTransactions",
+          match: {
+            transactionStatus: "Completed",
+            paymentStatus: "Paid",
+            redeemed: false,
+          },
+        },
+      })
       .populate("paymentMode");
 
     return successResponse(
@@ -127,16 +144,146 @@ const getCarwashTransactions = async (req, res) => {
   }
 };
 
-const transactionOne = async (req, res) => {
+const createNewBookingTransaction = async (req, res) => {
+  try {
+    const { customerId, bookingDeadline } = req.body;
+
+    if (!customerId || !bookingDeadline) {
+      return errorResponse(res, 400, "Please fill all required fields");
+    }
+
+    let billNo;
+    let existingBillNo;
+
+    do {
+      billNo = generateBillNo();
+      existingBillNo = await CarWashTransaction.findOne({ billNo });
+    } while (existingBillNo);
+
+    const existingTransaction = await CarWashTransaction.findOne({
+      bookingDeadline,
+      transactionStatus: "Booked",
+    });
+
+    if (existingTransaction) {
+      return errorResponse(
+        res,
+        400,
+        "There is already an active booking at this time"
+      );
+    }
+
+    const newTransaction = new CarWashTransaction({
+      customer: customerId,
+      billNo,
+      transactionStatus: "Booked",
+      bookingDeadline,
+    });
+
+    await newTransaction.save();
+
+    return successResponse(
+      res,
+      201,
+      "Booking transaction created successfully",
+      newTransaction
+    );
+  } catch (error) {
+    return errorResponse(res, 500, "Server error", error.message);
+  }
+};
+
+const transactionStartFromBooking = async (req, res) => {
   try {
     const {
+      transactionId,
       service,
-      billNo,
       vehicleNumber,
       customer,
       serviceStart,
       serviceRate,
     } = req.body;
+
+    const existingCustomer = await CarWashCustomer.findById(customer);
+    if (!existingCustomer) {
+      return errorResponse(res, 404, "Customer not found.");
+    }
+
+    const existingTransaction = await CarWashTransaction.findOne({
+      "service.id": service,
+      vehicleNumber,
+      transactionStatus: {
+        $not: {
+          $in: ["Completed", "Cancelled"],
+        },
+      },
+      paymentStatus: {
+        $not: {
+          $in: ["Paid", "Cancelled"],
+        },
+      },
+    });
+
+    if (existingTransaction) {
+      return errorResponse(
+        res,
+        400,
+        "There is already an active transaction for this service and vehicle number"
+      );
+    }
+
+    const transaction = await CarWashTransaction.findOneAndUpdate(
+      {
+        _id: transactionId,
+        transactionStatus: "Booked",
+      },
+      {
+        transactionStatus: "In Queue",
+        service: {
+          id: service,
+          start: serviceStart,
+          cost: serviceRate,
+        },
+        $unset: { deleteAt: "" },
+        vehicleNumber: vehicleNumber,
+      }
+    );
+    if (!transaction) {
+      return errorResponse(res, 404, "Transaction not found.");
+    }
+
+    existingCustomer.customerTransactions.push(transaction._id);
+    await existingCustomer.save();
+    return successResponse(
+      res,
+      200,
+      "Transaction updated successfully.",
+      transaction
+    );
+  } catch (err) {
+    console.error(err);
+    return errorResponse(
+      res,
+      500,
+      "Server error. Failed to create transaction."
+    );
+  }
+};
+
+const transactionOne = async (req, res) => {
+  try {
+    const { service, vehicleNumber, customer, serviceStart, serviceRate } =
+      req.body;
+
+    let billNo;
+    let existingBillNo;
+
+    if (!billNo) {
+      do {
+        billNo = generateBillNo();
+        existingBillNo = await CarWashTransaction.findOne({ billNo });
+      } while (existingBillNo);
+    }
 
     const existingTransaction = await CarWashTransaction.findOne({
       "service.id": service,
@@ -178,7 +325,7 @@ const transactionOne = async (req, res) => {
       vehicleNumber: vehicleNumber,
     });
 
-    await newTransaction.save();
+    // await newTransaction.save();
     const savedTransaction = await newTransaction.save();
     existingCustomer.customerTransactions.push(savedTransaction._id);
     await existingCustomer.save();
@@ -354,13 +501,6 @@ const getCheckoutDetails = async (req, res) => {
       (transaction) => transaction.service.id
     );
 
-    // const vehicleTypes = await CarWashVehicleType.find({
-    //   vehicleTypeOperational: true,
-    // }).populate({
-    //   path: "services",
-    //   match: { "streakApplicable.decision": true },
-    // });
-
     const paymentModes = await PaymentMode.find({
       paymentModeOperational: true,
     });
@@ -423,11 +563,12 @@ const getTransactionForInspection = async (req, res) => {
 const deleteTransaction = async (req, res) => {
   try {
     const transactionId = req.params.id;
+    console.log("🚀 ~ deleteTransaction ~ transactionId:", transactionId);
 
     const transaction = await CarWashTransaction.findOneAndUpdate(
       {
         _id: transactionId,
-        transactionStatus: "In Queue",
+        transactionStatus: { $in: ["In Queue", "Booked"] },
         paymentStatus: "Pending",
       },
       {
@@ -468,4 +609,6 @@ module.exports = {
   getTransactionForInspection,
   deleteTransaction,
   getCheckoutDetails,
+  createNewBookingTransaction,
+  transactionStartFromBooking,
 };
