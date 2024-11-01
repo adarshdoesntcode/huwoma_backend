@@ -432,8 +432,17 @@ const transactionThree = async (req, res) => {
       washCount,
     } = req.body;
 
-    const parkingInDateObj = new Date(parkingIn);
-    const parkingOutDateObj = new Date(parkingOut);
+    let parkingInDateObj = undefined;
+    let parkingOutDateObj = undefined;
+
+    if (parkingIn) {
+      parkingInDateObj = new Date(parkingIn);
+    }
+
+    if (parkingOut) {
+      parkingOutDateObj = new Date(parkingOut);
+    }
+
     const transactionTimeDateObj = new Date(transactionTime);
 
     if (
