@@ -1,4 +1,3 @@
-const { ca } = require("date-fns/locale");
 const CarWashCustomer = require("../models/CarWashCustomer");
 const CarWashTransaction = require("../models/CarWashTransaction");
 const CarWashVehicleType = require("../models/CarWashVehicleType");

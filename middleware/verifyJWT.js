@@ -1,5 +1,4 @@
 const jwt = require("jsonwebtoken");
-require("dotenv").config();
 const roleList = require("../config/roleList");
 
 const Admin = require("../models/Admin");
