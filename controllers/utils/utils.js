@@ -1,5 +1,5 @@
-export const generateBillNo = () => {
-  const now = new Date();
+export const generateBillNo = (clientDate) => {
+  const now = new Date(clientDate);
 
   const year = now.getFullYear().toString().slice(-2);
   const month = ("0" + (now.getMonth() + 1)).slice(-2);

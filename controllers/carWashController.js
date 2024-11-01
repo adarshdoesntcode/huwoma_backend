@@ -79,7 +79,7 @@ const findCustomer = async (req, res) => {
 
 const getCarwashTransactions = async (req, res) => {
   try {
-    const { date } = req.query;
+    const { date } = req.params;
 
     if (!date) {
       return errorResponse(res, 400, "Date is required.");
@@ -95,9 +95,24 @@ const getCarwashTransactions = async (req, res) => {
       $or: [
         {
           $or: [
-            { createdAt: { $gte: startOfDay, $lt: endOfDay } },
-            { transactionTime: { $gte: startOfDay, $lt: endOfDay } },
-            { "service.end": { $gte: startOfDay, $lt: endOfDay } },
+            {
+              createdAt: {
+                $gte: startOfDay,
+                $lt: endOfDay,
+              },
+            },
+            {
+              transactionTime: {
+                $gte: startOfDay,
+                $lt: endOfDay,
+              },
+            },
+            {
+              "service.end": {
+                $gte: startOfDay,
+                $lt: endOfDay,
+              },
+            },
           ],
         },
         {
@@ -146,7 +161,12 @@ const getCarwashTransactions = async (req, res) => {
 
 const createNewBookingTransaction = async (req, res) => {
   try {
-    const { customerId, bookingDeadline } = req.body;
+    const { customerId, bookingDeadline, clientDate } = req.body;
+
+    const bookingDeadlineDateObj = new Date(bookingDeadline);
+    if (isNaN(bookingDeadlineDateObj.getTime())) {
+      return errorResponse(res, 400, "Invalid date format");
+    }
 
     if (!customerId || !bookingDeadline) {
       return errorResponse(res, 400, "Please fill all required fields");
@@ -156,12 +176,12 @@ const createNewBookingTransaction = async (req, res) => {
     let existingBillNo;
 
     do {
-      billNo = generateBillNo();
+      billNo = generateBillNo(clientDate);
       existingBillNo = await CarWashTransaction.findOne({ billNo });
     } while (existingBillNo);
 
     const existingTransaction = await CarWashTransaction.findOne({
-      bookingDeadline,
+      bookingDeadline: bookingDeadlineDateObj,
       transactionStatus: "Booked",
     });
 
@@ -204,6 +224,11 @@ const transactionStartFromBooking = async (req, res) => {
       serviceRate,
     } = req.body;
 
+    const serviceStartDateObj = new Date(serviceStart);
+    if (isNaN(serviceStartDateObj.getTime())) {
+      return errorResponse(res, 400, "Invalid date format");
+    }
+
     const existingCustomer = await CarWashCustomer.findById(customer);
     if (!existingCustomer) {
       return errorResponse(res, 404, "Customer not found.");
@@ -241,7 +266,7 @@ const transactionStartFromBooking = async (req, res) => {
         transactionStatus: "In Queue",
         service: {
           id: service,
-          start: serviceStart,
+          start: serviceStartDateObj,
           cost: serviceRate,
         },
         $unset: { deleteAt: "" },
@@ -272,15 +297,26 @@ const transactionStartFromBooking = async (req, res) => {
 
 const transactionOne = async (req, res) => {
   try {
-    const { service, vehicleNumber, customer, serviceStart, serviceRate } =
-      req.body;
+    const {
+      service,
+      vehicleNumber,
+      customer,
+      serviceStart,
+      serviceRate,
+      clientDate,
+    } = req.body;
+
+    const serviceStartDateObj = new Date(serviceStart);
+    if (isNaN(serviceStartDateObj.getTime())) {
+      return errorResponse(res, 400, "Invalid date format");
+    }
 
     let billNo;
     let existingBillNo;
 
     if (!billNo) {
       do {
-        billNo = generateBillNo();
+        billNo = generateBillNo(clientDate);
         existingBillNo = await CarWashTransaction.findOne({ billNo });
       } while (existingBillNo);
     }
@@ -318,14 +354,13 @@ const transactionOne = async (req, res) => {
       transactionStatus: "In Queue",
       service: {
         id: service,
-        start: serviceStart,
+        start: serviceStartDateObj,
         cost: serviceRate,
       },
       billNo,
       vehicleNumber: vehicleNumber,
     });
 
-    // await newTransaction.save();
     const savedTransaction = await newTransaction.save();
     existingCustomer.customerTransactions.push(savedTransaction._id);
     await existingCustomer.save();
@@ -350,13 +385,18 @@ const transactionTwo = async (req, res) => {
   try {
     const { transactionId, inspections, serviceEnd } = req.body;
 
+    const serviceEndDateObj = new Date(serviceEnd);
+    if (isNaN(serviceEndDateObj.getTime())) {
+      return errorResponse(res, 400, "Invalid date format");
+    }
+
     const transaction = await CarWashTransaction.findById(transactionId);
     if (!transaction) {
       return errorResponse(res, 404, "Transaction not found.");
     }
 
     transaction.transactionStatus = "Ready for Pickup";
-    transaction.service.end = serviceEnd;
+    transaction.service.end = serviceEndDateObj;
     transaction.inspections = inspections;
 
     await transaction.save();
@@ -392,6 +432,18 @@ const transactionThree = async (req, res) => {
       washCount,
     } = req.body;
 
+    const parkingInDateObj = new Date(parkingIn);
+    const parkingOutDateObj = new Date(parkingOut);
+    const transactionTimeDateObj = new Date(transactionTime);
+
+    if (
+      isNaN(parkingInDateObj.getTime()) ||
+      isNaN(parkingOutDateObj.getTime()) ||
+      isNaN(transactionTimeDateObj.getTime())
+    ) {
+      return errorResponse(res, 400, "Invalid date format");
+    }
+
     if (!transactionId) {
       return errorResponse(res, 400, "Transaction ID is required.");
     }
@@ -415,11 +467,11 @@ const transactionThree = async (req, res) => {
         paymentStatus,
         paymentMode,
         parking: {
-          in: parkingIn,
-          out: parkingOut,
+          in: parkingInDateObj,
+          out: parkingOutDateObj,
           cost: parkingCost,
         },
-        transactionTime,
+        transactionTime: transactionTimeDateObj,
         grossAmount,
         discountAmount,
         netAmount,
@@ -563,7 +615,6 @@ const getTransactionForInspection = async (req, res) => {
 const deleteTransaction = async (req, res) => {
   try {
     const transactionId = req.params.id;
-    console.log("🚀 ~ deleteTransaction ~ transactionId:", transactionId);
 
     const transaction = await CarWashTransaction.findOneAndUpdate(
       {
