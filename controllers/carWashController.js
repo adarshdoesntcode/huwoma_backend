@@ -437,19 +437,21 @@ const transactionThree = async (req, res) => {
 
     if (parkingIn) {
       parkingInDateObj = new Date(parkingIn);
+      if (isNaN(parkingInDateObj.getTime())) {
+        return errorResponse(res, 400, "Invalid date format");
+      }
     }
 
     if (parkingOut) {
       parkingOutDateObj = new Date(parkingOut);
+      if (isNaN(parkingOutDateObj.getTime())) {
+        return errorResponse(res, 400, "Invalid date format");
+      }
     }
 
     const transactionTimeDateObj = new Date(transactionTime);
 
-    if (
-      isNaN(parkingInDateObj.getTime()) ||
-      isNaN(parkingOutDateObj.getTime()) ||
-      isNaN(transactionTimeDateObj.getTime())
-    ) {
+    if (isNaN(transactionTimeDateObj.getTime())) {
       return errorResponse(res, 400, "Invalid date format");
     }
 
