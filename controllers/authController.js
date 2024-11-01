@@ -63,7 +63,7 @@ const handleLogin = async (req, res) => {
 
     foundUser = await Admin.findOne({
       email: email,
-    }).exec();
+    });
 
     if (!foundUser)
       return res.status(401).json({
@@ -119,7 +119,7 @@ const handleLogin = async (req, res) => {
       });
     }
   } catch (err) {
-    console.log(`error-message`);
+    console.log(err);
     return res.sendStatus(400);
   }
 };

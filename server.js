@@ -14,14 +14,13 @@ const verifyPOSAccessToken = require("./middleware/verifyPOSAccessToken");
 
 const PORT = process.env.PORT || 3500;
 
-connectDB();
-
 app.use(credentials);
 app.use(cors(corsOptions));
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 app.use(cookieParser());
 
+connectDB();
 // Define routes
 app.use("/", require("./routes/api"));
 
@@ -35,9 +34,11 @@ app.use("/api/pos", verifyPOSAccessToken, require("./routes/pos"));
 app.use("/api/settings", verifyJWT, require("./routes/settings"));
 app.use("/api/carwash", verifyJWT, require("./routes/carwash"));
 
-mongoose.connection.once("open", () => {
-  console.log("Database Connected ✅");
-  app.listen(PORT, () => console.log(`Server Running on Port : ${PORT} 🚀🚀`));
-});
+if (process.env.NODE_ENV !== "production") {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`Server Running on Port : ${PORT} 🚀🚀`);
+  });
+}
 
 module.exports = app;
