@@ -3,6 +3,7 @@ const CarWashTransaction = require("../models/CarWashTransaction");
 const CarWashVehicleType = require("../models/CarWashVehicleType");
 const InspectionTemplate = require("../models/InspectionTemplate");
 const PaymentMode = require("../models/PaymentMode");
+const ServiceType = require("../models/ServiceType");
 const { errorResponse, successResponse } = require("./utils/reponse");
 const { generateBillNo } = require("./utils/utils");
 
@@ -224,6 +225,7 @@ const transactionStartFromBooking = async (req, res) => {
     } = req.body;
 
     const serviceStartDateObj = new Date(serviceStart);
+
     if (isNaN(serviceStartDateObj.getTime())) {
       return errorResponse(res, 400, "Invalid date format");
     }
@@ -247,6 +249,11 @@ const transactionStartFromBooking = async (req, res) => {
         },
       },
     });
+
+    const existingService = await ServiceType.findById(service);
+    if (!existingService) {
+      return errorResponse(res, 404, "Service not found.");
+    }
 
     if (existingTransaction) {
       return errorResponse(
@@ -277,7 +284,10 @@ const transactionStartFromBooking = async (req, res) => {
     }
 
     existingCustomer.customerTransactions.push(transaction._id);
+    existingService.serviceTransactions.push(transaction._id);
+
     await existingCustomer.save();
+    await existingService.save();
     return successResponse(
       res,
       200,
@@ -343,6 +353,10 @@ const transactionOne = async (req, res) => {
       );
     }
 
+    const existingService = await ServiceType.findById(service);
+    if (!existingService) {
+      return errorResponse(res, 404, "Service not found.");
+    }
     const existingCustomer = await CarWashCustomer.findById(customer);
     if (!existingCustomer) {
       return errorResponse(res, 404, "Customer not found.");
@@ -362,7 +376,10 @@ const transactionOne = async (req, res) => {
 
     const savedTransaction = await newTransaction.save();
     existingCustomer.customerTransactions.push(savedTransaction._id);
+    existingService.serviceTransactions.push(savedTransaction._id);
+
     await existingCustomer.save();
+    await existingService.save();
 
     return successResponse(
       res,
@@ -536,6 +553,9 @@ const transactionThree = async (req, res) => {
 const getCheckoutDetails = async (req, res) => {
   try {
     const customerId = req.params.customerId;
+    if (!customerId) {
+      return errorResponse(res, 404, "No Customer ID.");
+    }
 
     const customer = await CarWashCustomer.findById(customerId).populate({
       path: "customerTransactions",
@@ -660,6 +680,34 @@ const deleteTransaction = async (req, res) => {
   }
 };
 
+const getPreFilterTransactions = async (req, res) => {
+  try {
+    const vehicleTypes = await CarWashVehicleType.find({
+      $or: [
+        { services: { $exists: true, $not: { $size: 0 } } },
+        { vehicleTypeOperational: true },
+      ],
+    }).populate({
+      path: "services",
+      match: {
+        $or: [
+          { serviceTypeOperational: true },
+          { serviceTransactions: { $exists: true, $not: { $size: 0 } } },
+        ],
+      },
+    });
+
+    return successResponse(
+      res,
+      200,
+      "Vehicle types retrieved successfully.",
+      vehicleTypes
+    );
+  } catch (err) {
+    return errorResponse(res, 500, "Server error. Failed to retrieve");
+  }
+};
+
 module.exports = {
   createCustomer,
   findCustomer,
@@ -672,4 +720,5 @@ module.exports = {
   getCheckoutDetails,
   createNewBookingTransaction,
   transactionStartFromBooking,
+  getPreFilterTransactions,
 };

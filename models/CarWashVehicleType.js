@@ -13,15 +13,8 @@ const CarWashVehicleTypeSchema = new Schema(
         ref: "ServiceType",
       },
     ],
-    packages: [
-      {
-        type: Schema.Types.ObjectId,
-        ref: "PackageType",
-      },
-    ],
     vehicleIcon: {
       type: String,
-      // required: true,
     },
     billAbbreviation: {
       type: String,

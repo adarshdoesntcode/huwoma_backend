@@ -41,6 +41,12 @@ const ServiceTypeSchema = new Schema(
         type: Number,
       },
     },
+    serviceTransactions: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "CarWashTransaction",
+      },
+    ],
     serviceVehicle: {
       type: Schema.Types.ObjectId,
       ref: "CarWashVehicleType",

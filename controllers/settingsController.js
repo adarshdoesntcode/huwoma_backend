@@ -40,15 +40,10 @@ const getAllVehicleType = async (req, res) => {
   try {
     const activeVehicleTypes = await CarWashVehicleType.find({
       vehicleTypeOperational: true,
-    })
-      .populate({
-        path: "services",
-        match: { serviceTypeOperational: true },
-      })
-      .populate({
-        path: "packages",
-        match: { packageTypeOperational: true },
-      });
+    }).populate({
+      path: "services",
+      match: { serviceTypeOperational: true },
+    });
 
     if (activeVehicleTypes.length === 0) {
       return successResponse(res, 204, "No Content", activeVehicleTypes);

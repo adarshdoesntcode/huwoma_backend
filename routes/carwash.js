@@ -22,6 +22,13 @@ router
 
 //====================TRANSACTION======================
 router
+  .route("/transaction/prefilter")
+  .get(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    carWashController.getPreFilterTransactions
+  );
+
+router
   .route("/transaction/:id")
   .get(
     verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
