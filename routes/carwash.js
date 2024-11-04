@@ -27,6 +27,12 @@ router
     verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
     carWashController.getPreFilterTransactions
   );
+router
+  .route("/transaction/postfilter")
+  .post(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    carWashController.getPostFilterTransactions
+  );
 
 router
   .route("/transaction/:id")

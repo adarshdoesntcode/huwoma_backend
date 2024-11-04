@@ -708,6 +708,68 @@ const getPreFilterTransactions = async (req, res) => {
   }
 };
 
+const getPostFilterTransactions = async (req, res) => {
+  try {
+    const filter = req.body;
+    const query = {};
+
+    if (filter.timeRange?.from) {
+      query.createdAt = {
+        $gte: new Date(filter.timeRange.from),
+        ...(filter.timeRange.to && { $lte: new Date(filter.timeRange.to) }),
+      };
+    }
+
+    if (filter.transactionStatus) {
+      query.transactionStatus = filter.transactionStatus;
+    }
+
+    if (filter.paymentStatus) {
+      query.paymentStatus = filter.paymentStatus;
+    }
+
+    if (filter.serviceId) {
+      query["service.id"] = filter.serviceId;
+    }
+
+    let transactionsQuery = CarWashTransaction.find(query)
+      .populate("service.id")
+      .sort({ createdAt: 1 })
+      .populate({
+        path: "service.id",
+        populate: {
+          path: "serviceVehicle",
+        },
+      })
+      .populate("customer")
+      .populate("paymentMode");
+    if (filter.vehicleId) {
+      transactionsQuery = transactionsQuery.populate({
+        path: "service.id",
+        match: { serviceVehicle: filter.vehicleId },
+        populate: {
+          path: "serviceVehicle",
+        },
+      });
+    }
+
+    const transactions = await transactionsQuery.exec();
+
+    const filteredTransactions = filter.vehicleId
+      ? transactions.filter((t) => t.service.id)
+      : transactions;
+
+    return successResponse(
+      res,
+      200,
+      "Transactions retrieved",
+      filteredTransactions
+    );
+  } catch (err) {
+    return errorResponse(res, 500, "Server error. Failed to retrieve");
+  }
+};
+
 module.exports = {
   createCustomer,
   findCustomer,
@@ -721,4 +783,5 @@ module.exports = {
   createNewBookingTransaction,
   transactionStartFromBooking,
   getPreFilterTransactions,
+  getPostFilterTransactions,
 };
