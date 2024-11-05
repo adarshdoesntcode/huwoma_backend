@@ -1,3 +1,4 @@
+const { startOfDay: sod, endOfDay: eod, parseISO } = require("date-fns");
 const CarWashCustomer = require("../models/CarWashCustomer");
 const CarWashTransaction = require("../models/CarWashTransaction");
 const CarWashVehicleType = require("../models/CarWashVehicleType");
@@ -85,11 +86,8 @@ const getCarwashTransactions = async (req, res) => {
       return errorResponse(res, 400, "Date is required.");
     }
 
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+    const startOfDay = sod(new Date(date));
+    const endOfDay = eod(new Date(date));
 
     const transactions = await CarWashTransaction.find({
       $or: [
@@ -155,6 +153,7 @@ const getCarwashTransactions = async (req, res) => {
       transactions
     );
   } catch (err) {
+    console.log(err);
     return errorResponse(res, 500, "Failed to retrieve transactions.");
   }
 };
