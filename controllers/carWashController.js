@@ -1,4 +1,3 @@
-const { startOfDay: sod, endOfDay: eod, parseISO } = require("date-fns");
 const CarWashCustomer = require("../models/CarWashCustomer");
 const CarWashTransaction = require("../models/CarWashTransaction");
 const CarWashVehicleType = require("../models/CarWashVehicleType");
@@ -86,8 +85,30 @@ const getCarwashTransactions = async (req, res) => {
       return errorResponse(res, 400, "Date is required.");
     }
 
-    const startOfDay = sod(new Date(date));
-    const endOfDay = eod(new Date(date));
+    const dateObj = new Date(date);
+    const startOfDay = new Date(
+      Date.UTC(
+        dateObj.getUTCFullYear(),
+        dateObj.getUTCMonth(),
+        dateObj.getUTCDate(),
+        0,
+        0,
+        0,
+        0
+      )
+    );
+
+    const endOfDay = new Date(
+      Date.UTC(
+        dateObj.getUTCFullYear(),
+        dateObj.getUTCMonth(),
+        dateObj.getUTCDate(),
+        23,
+        59,
+        59,
+        999
+      )
+    );
 
     const transactions = await CarWashTransaction.find({
       $or: [
@@ -160,7 +181,14 @@ const getCarwashTransactions = async (req, res) => {
 
 const createNewBookingTransaction = async (req, res) => {
   try {
-    const { customerId, bookingDeadline, clientDate } = req.body;
+    const {
+      customerId,
+      bookingDeadline,
+      //  clientDate
+    } = req.body;
+
+    const now = new Date();
+    const clientDate = now.toISOString();
 
     const bookingDeadlineDateObj = new Date(bookingDeadline);
     if (isNaN(bookingDeadlineDateObj.getTime())) {
@@ -219,11 +247,15 @@ const transactionStartFromBooking = async (req, res) => {
       service,
       vehicleNumber,
       customer,
-      serviceStart,
+      // serviceStart,
       serviceRate,
+      actualRate,
     } = req.body;
 
-    const serviceStartDateObj = new Date(serviceStart);
+    const now = new Date();
+    const serviceStartDateObj = new Date(now); // Using server-generated date for `serviceStart`
+
+    // const serviceStartDateObj = new Date(serviceStart);
 
     if (isNaN(serviceStartDateObj.getTime())) {
       return errorResponse(res, 400, "Invalid date format");
@@ -273,6 +305,7 @@ const transactionStartFromBooking = async (req, res) => {
           id: service,
           start: serviceStartDateObj,
           cost: serviceRate,
+          actualRate,
         },
         $unset: { deleteAt: "" },
         vehicleNumber: vehicleNumber,
@@ -309,15 +342,20 @@ const transactionOne = async (req, res) => {
       service,
       vehicleNumber,
       customer,
-      serviceStart,
+      // serviceStart,
+      actualRate,
       serviceRate,
-      clientDate,
+      // clientDate,
     } = req.body;
 
-    const serviceStartDateObj = new Date(serviceStart);
-    if (isNaN(serviceStartDateObj.getTime())) {
-      return errorResponse(res, 400, "Invalid date format");
-    }
+    const now = new Date();
+    const serviceStartDateObj = new Date(now); // Using server-generated date for `serviceStart`
+    const clientDate = now.toISOString();
+
+    // const serviceStartDateObj = new Date(serviceStart);
+    // if (isNaN(serviceStartDateObj.getTime())) {
+    //   return errorResponse(res, 400, "Invalid date format");
+    // }
 
     let billNo;
     let existingBillNo;
@@ -368,6 +406,7 @@ const transactionOne = async (req, res) => {
         id: service,
         start: serviceStartDateObj,
         cost: serviceRate,
+        actualRate,
       },
       billNo,
       vehicleNumber: vehicleNumber,
@@ -398,12 +437,19 @@ const transactionOne = async (req, res) => {
 
 const transactionTwo = async (req, res) => {
   try {
-    const { transactionId, inspections, serviceEnd } = req.body;
+    const {
+      transactionId,
+      inspections,
+      // serviceEnd
+    } = req.body;
 
-    const serviceEndDateObj = new Date(serviceEnd);
-    if (isNaN(serviceEndDateObj.getTime())) {
-      return errorResponse(res, 400, "Invalid date format");
-    }
+    const now = new Date();
+    const serviceEndDateObj = new Date(now); // Using server-generated date for `serviceStart`
+
+    // const serviceEndDateObj = new Date(serviceEnd);
+    // if (isNaN(serviceEndDateObj.getTime())) {
+    //   return errorResponse(res, 400, "Invalid date format");
+    // }
 
     const transaction = await CarWashTransaction.findById(transactionId);
     if (!transaction) {
@@ -439,7 +485,7 @@ const transactionThree = async (req, res) => {
       parkingIn,
       parkingOut,
       parkingCost,
-      transactionTime,
+      // transactionTime,
       grossAmount,
       discountAmount,
       netAmount,
@@ -464,7 +510,8 @@ const transactionThree = async (req, res) => {
       }
     }
 
-    const transactionTimeDateObj = new Date(transactionTime);
+    const now = new Date();
+    const transactionTimeDateObj = new Date(now);
 
     if (isNaN(transactionTimeDateObj.getTime())) {
       return errorResponse(res, 400, "Invalid date format");

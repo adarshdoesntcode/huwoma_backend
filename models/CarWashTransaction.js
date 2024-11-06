@@ -23,6 +23,10 @@ const CarWashTransactionSchema = new Schema(
         type: Number,
         min: 0,
       },
+      actualRate: {
+        type: Number,
+        min: 0,
+      },
     },
     parking: {
       in: {
