@@ -75,6 +75,86 @@ const findCustomer = async (req, res) => {
   }
 };
 
+const getAllCustomers = async (req, res) => {
+  try {
+    const customers = await CarWashCustomer.aggregate([
+      {
+        $lookup: {
+          from: "carwashtransactions",
+          localField: "customerTransactions",
+          foreignField: "_id",
+          as: "transactions",
+        },
+      },
+      {
+        $addFields: {
+          totalNetAmount: {
+            $sum: "$transactions.netAmount",
+          },
+        },
+      },
+      {
+        $sort: { createdAt: -1 },
+      },
+    ]);
+
+    return successResponse(
+      res,
+      200,
+      "Customers retrieved successfully",
+      customers
+    );
+  } catch (error) {
+    return errorResponse(res, 500, "Server error", error.message);
+  }
+};
+
+const getCustomerById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return errorResponse(res, 400, "Id is required.");
+    }
+
+    const customer = await CarWashCustomer.findById(id).populate({
+      path: "customerTransactions",
+      populate: [
+        {
+          path: "service.id",
+          populate: {
+            path: "serviceVehicle",
+          },
+        },
+        { path: "customer" },
+        { path: "paymentMode" },
+      ],
+      options: { sort: { createdAt: -1 } },
+    });
+
+    if (!customer) {
+      return errorResponse(res, 404, "Customer not found");
+    }
+
+    const activeVehicleTypes = await CarWashVehicleType.find({
+      vehicleTypeOperational: true,
+    }).populate({
+      path: "services",
+      match: {
+        serviceTypeOperational: true,
+        "streakApplicable.decision": true,
+      },
+    });
+
+    return successResponse(res, 200, "Customer retrieved successfully", {
+      customer,
+      activeVehicleTypes,
+    });
+  } catch (error) {
+    return errorResponse(res, 500, "Server error", error.message);
+  }
+};
+
 // ====================TRANSACTION=============================
 
 const getCarwashTransactions = async (req, res) => {
@@ -817,6 +897,7 @@ const getPostFilterTransactions = async (req, res) => {
 };
 
 module.exports = {
+  getAllCustomers,
   createCustomer,
   findCustomer,
   transactionOne,
@@ -830,4 +911,5 @@ module.exports = {
   transactionStartFromBooking,
   getPreFilterTransactions,
   getPostFilterTransactions,
+  getCustomerById,
 };

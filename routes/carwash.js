@@ -19,6 +19,19 @@ router
     verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
     carWashController.createCustomer
   );
+router
+  .route("/customers")
+  .get(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    carWashController.getAllCustomers
+  );
+
+router
+  .route("/customer/:id")
+  .get(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    carWashController.getCustomerById
+  );
 
 //====================TRANSACTION======================
 router
