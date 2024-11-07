@@ -52,7 +52,7 @@ const getAllVehicleType = async (req, res) => {
     return successResponse(
       res,
       200,
-      "Active vehicle types with service and package",
+      "Active vehicle types with service",
       activeVehicleTypes
     );
   } catch (error) {
@@ -64,15 +64,10 @@ const getVehicleTypeById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const vehicleType = await CarWashVehicleType.findById(id)
-      .populate({
-        path: "services",
-        match: { serviceTypeOperational: true },
-      })
-      .populate({
-        path: "packages",
-        match: { packageTypeOperational: true },
-      });
+    const vehicleType = await CarWashVehicleType.findById(id).populate({
+      path: "services",
+      match: { serviceTypeOperational: true },
+    });
 
     if (!vehicleType) {
       return successResponse(res, 404, "Vehicle type not found");
@@ -134,10 +129,10 @@ const deleteVehicleType = async (req, res) => {
       { serviceTypeOperational: false }
     );
 
-    await PackageType.updateMany(
-      { _id: { $in: vehicleType.packages } },
-      { packageTypeOperational: false }
-    );
+    // await PackageType.updateMany(
+    //   { _id: { $in: vehicleType.packages } },
+    //   { packageTypeOperational: false }
+    // );
 
     return successResponse(res, 200, "Config deactivated", vehicleType);
   } catch (error) {
