@@ -31,6 +31,10 @@ router
   .get(
     verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
     carWashController.getCustomerById
+  )
+  .put(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    carWashController.updateCarwashCustomer
   );
 
 //====================TRANSACTION======================

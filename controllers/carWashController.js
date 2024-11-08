@@ -155,6 +155,34 @@ const getCustomerById = async (req, res) => {
   }
 };
 
+const updateCarwashCustomer = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { customerName, customerContact } = req.body;
+
+    if (!id || !customerName || !customerContact) {
+      return errorResponse(
+        res,
+        400,
+        "Id, customerName, and customerContact are required."
+      );
+    }
+
+    const customer = await CarWashCustomer.findByIdAndUpdate(id, {
+      customerName,
+      customerContact,
+    });
+
+    if (!customer) {
+      return errorResponse(res, 404, "Customer not found");
+    }
+
+    return successResponse(res, 200, "Customer updated successfully", customer);
+  } catch (error) {
+    return errorResponse(res, 500, "Server error", error.message);
+  }
+};
+
 // ====================TRANSACTION=============================
 
 const getCarwashTransactions = async (req, res) => {
@@ -912,4 +940,5 @@ module.exports = {
   getPreFilterTransactions,
   getPostFilterTransactions,
   getCustomerById,
+  updateCarwashCustomer,
 };
