@@ -5,7 +5,7 @@ const SimRacingTransactionSchema = new Schema(
   {
     customer: {
       type: Schema.Types.ObjectId,
-      ref: "CarWashCustomer",
+      ref: "SimRacingCustomer",
       required: true,
     },
     rig: {

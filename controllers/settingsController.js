@@ -6,6 +6,7 @@ const InspectionTemplate = require("../models/InspectionTemplate");
 const { errorResponse, successResponse } = require("./utils/reponse");
 
 const POSAccess = require("../models/POSAccess");
+const SimRacingRig = require("../models/SimRacingRig");
 
 //====================VEHICLE TYPE======================
 
@@ -555,6 +556,108 @@ const updateInspectionTemplate = async (req, res) => {
   }
 };
 
+//====================SIM RACING======================
+
+const createNewSimRacingRig = async (req, res) => {
+  const { rigName } = req.body;
+
+  if (!rigName) {
+    return errorResponse(res, 400, "Rig name is required");
+  }
+
+  const newRig = new SimRacingRig({
+    rigName,
+  });
+
+  try {
+    const savedRig = await newRig.save();
+    return successResponse(
+      res,
+      201,
+      "New Sim Racing rig created successfully",
+      savedRig
+    );
+  } catch (error) {
+    console.error(error);
+    return errorResponse(res, 500, "Server error", error.message);
+  }
+};
+
+const updateSimRacingRig = async (req, res) => {
+  const { rigId, rigName } = req.body;
+
+  if (!rigId || !rigName) {
+    return errorResponse(res, 400, "Rig ID and Rig Name are required");
+  }
+
+  try {
+    const updatedRig = await SimRacingRig.findByIdAndUpdate(
+      rigId,
+      { $set: { rigName } },
+      { new: true }
+    );
+
+    if (!updatedRig) {
+      return errorResponse(res, 404, "Sim Racing rig not found");
+    }
+
+    return successResponse(
+      res,
+      200,
+      "Sim Racing rig updated successfully",
+      updatedRig
+    );
+  } catch (error) {
+    console.error(error);
+    return errorResponse(res, 500, "Server error", error.message);
+  }
+};
+
+const deleteSimRacingRig = async (req, res) => {
+  const { rigId } = req.body;
+
+  if (!rigId) {
+    return errorResponse(res, 400, "Rig ID is required");
+  }
+
+  try {
+    const rig = await SimRacingRig.findByIdAndUpdate(
+      rigId,
+      { $set: { rigOperational: false } },
+      { new: true }
+    );
+
+    if (!rig) {
+      return errorResponse(res, 404, "Sim Racing rig not found");
+    }
+
+    return successResponse(
+      res,
+      200,
+      "Sim Racing rig deleted successfully",
+      rig
+    );
+  } catch (error) {
+    console.error(error);
+    return errorResponse(res, 500, "Server error", error.message);
+  }
+};
+
+const getAllSimRacingRigs = async (req, res) => {
+  try {
+    const operationalRigs = await SimRacingRig.find({ rigOperational: true });
+    return successResponse(
+      res,
+      200,
+      "Operational Sim Racing rigs fetched successfully",
+      operationalRigs
+    );
+  } catch (error) {
+    console.error(error);
+    return errorResponse(res, 500, "Server error", error.message);
+  }
+};
+
 //====================PAYMENT MODE======================
 
 const createPaymentMode = async (req, res) => {
@@ -749,4 +852,5 @@ module.exports = {
   createPOSAccess,
   getAllPOSAccess,
   deletePOSAccess,
+  createNewSimRacingRig,
 };

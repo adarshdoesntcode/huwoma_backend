@@ -75,10 +75,6 @@ router
     verifyRoles(ROLES_LIST.superAdmin),
     settingsController.createInspectionTemplate
   );
-// .put(
-//   verifyRoles(ROLES_LIST.superAdmin),
-//   settingsController.updateInspectionTemplate
-// );
 
 //====================INSPECTION======================
 
@@ -91,6 +87,15 @@ router
   .post(
     verifyRoles(ROLES_LIST.superAdmin),
     settingsController.createInspectionTemplate
+  );
+
+//====================SIM RACING RIG======================
+
+router
+  .route("/simracing")
+  .post(
+    verifyRoles(ROLES_LIST.superAdmin),
+    settingsController.createNewSimRacingRig
   );
 
 //====================PAYMENT MODE======================

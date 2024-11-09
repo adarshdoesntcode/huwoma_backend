@@ -71,7 +71,7 @@ const findCustomer = async (req, res) => {
       customer
     );
   } catch (error) {
-    return errorResponse(res, 500, "Server error", error.mess);
+    return errorResponse(res, 500, "Server error", error.message);
   }
 };
 
