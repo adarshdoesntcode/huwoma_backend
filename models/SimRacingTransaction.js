@@ -20,7 +20,7 @@ const SimRacingTransactionSchema = new Schema(
     },
     transactionStatus: {
       type: String,
-      enum: ["Active", "Completed", "Cancelled"],
+      enum: ["Active", "Completed", "Cancelled", "Booked"],
       default: "Active",
     },
     paymentStatus: {

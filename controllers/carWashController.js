@@ -187,18 +187,13 @@ const updateCarwashCustomer = async (req, res) => {
 
 const getCarwashTransactions = async (req, res) => {
   try {
-    const { date } = req.params;
+    const now = new Date();
+    const nowDateObj = new Date(now);
 
-    if (!date) {
-      return errorResponse(res, 400, "Date is required.");
-    }
-
-    const dateObj = new Date(date);
-
-    const startOfDay = new Date(dateObj);
+    const startOfDay = new Date(nowDateObj);
     startOfDay.setUTCHours(0, 0, 0, 0);
 
-    const endOfDay = new Date(dateObj);
+    const endOfDay = new Date(nowDateObj);
     endOfDay.setUTCHours(23, 59, 59, 999);
 
     const transactions = await CarWashTransaction.find({

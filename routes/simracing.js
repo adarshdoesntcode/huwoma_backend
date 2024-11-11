@@ -39,10 +39,50 @@ router
   );
 
 router
-  .route("/transactions/:date")
+  .route("/transactions")
   .get(
     verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
     simRacingController.getSimracingTransactions
+  );
+
+router
+  .route("/transaction/booking")
+  .post(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    simRacingController.createNewBookingTransaction
+  )
+  .put(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    simRacingController.raceStartFromBooking
+  );
+
+router
+  .route("/checkoutdetails/:transactionId")
+  .get(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    simRacingController.getCheckoutDetails
+  );
+
+router
+  .route("/transaction/checkout")
+  .post(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    simRacingController.simracingCheckout
+  );
+
+router
+  .route("/transaction/:id")
+  // .get(
+  //   verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+  //   simRacingController.getTransactionForInspection
+  // )
+  .put(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    simRacingController.cancelRace
+  )
+  .delete(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    simRacingController.deleteTransaction
   );
 
 module.exports = router;

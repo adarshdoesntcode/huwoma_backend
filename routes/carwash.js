@@ -70,7 +70,7 @@ router
   );
 
 router
-  .route("/transactions/:date")
+  .route("/transactions")
   .get(
     verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
     carWashController.getCarwashTransactions
