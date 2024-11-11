@@ -194,29 +194,12 @@ const getCarwashTransactions = async (req, res) => {
     }
 
     const dateObj = new Date(date);
-    const startOfDay = new Date(
-      Date.UTC(
-        dateObj.getUTCFullYear(),
-        dateObj.getUTCMonth(),
-        dateObj.getUTCDate(),
-        0,
-        0,
-        0,
-        0
-      )
-    );
 
-    const endOfDay = new Date(
-      Date.UTC(
-        dateObj.getUTCFullYear(),
-        dateObj.getUTCMonth(),
-        dateObj.getUTCDate(),
-        23,
-        59,
-        59,
-        999
-      )
-    );
+    const startOfDay = new Date(dateObj);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(dateObj);
+    endOfDay.setUTCHours(23, 59, 59, 999);
 
     const transactions = await CarWashTransaction.find({
       $or: [
