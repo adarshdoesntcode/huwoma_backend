@@ -2,7 +2,9 @@ const CarWashVehicleType = require("../models/CarWashVehicleType");
 const PackageType = require("../models/PackageType");
 const PaymentMode = require("../models/PaymentMode");
 const ServiceType = require("../models/ServiceType");
+const Configuration = require("../models/Configuration");
 const InspectionTemplate = require("../models/InspectionTemplate");
+
 const { errorResponse, successResponse } = require("./utils/reponse");
 
 const POSAccess = require("../models/POSAccess");
@@ -129,11 +131,6 @@ const deleteVehicleType = async (req, res) => {
       { _id: { $in: vehicleType.services } },
       { serviceTypeOperational: false }
     );
-
-    // await PackageType.updateMany(
-    //   { _id: { $in: vehicleType.packages } },
-    //   { packageTypeOperational: false }
-    // );
 
     return successResponse(res, 200, "Config deactivated", vehicleType);
   } catch (error) {
@@ -621,6 +618,16 @@ const deleteSimRacingRig = async (req, res) => {
   }
 
   try {
+    const activeRig = await SimRacingRig.findOne({
+      _id: rigId,
+      activeRacer: { $exists: true },
+      activeTransaction: { $exists: true },
+    });
+
+    if (activeRig) {
+      return errorResponse(res, 400, "Rig is currently active with a racer");
+    }
+
     const rig = await SimRacingRig.findByIdAndUpdate(
       rigId,
       { $set: { rigOperational: false } },
@@ -651,6 +658,54 @@ const getAllSimRacingRigs = async (req, res) => {
       200,
       "Operational Sim Racing rigs fetched successfully",
       operationalRigs
+    );
+  } catch (error) {
+    console.error(error);
+    return errorResponse(res, 500, "Server error", error.message);
+  }
+};
+
+const updateSimRacingCoordinates = async (req, res) => {
+  try {
+    const { simRacingCoordinates } = req.body;
+
+    if (!simRacingCoordinates) {
+      return errorResponse(res, 400, "Sim racing coordinates are required");
+    }
+
+    const configuration = await Configuration.findOneAndUpdate(
+      {},
+      {
+        simRacingCoordinates,
+      },
+      {
+        upsert: true,
+        new: true,
+      }
+    );
+
+    return successResponse(
+      res,
+      200,
+      "Location updated successfully",
+      configuration
+    );
+  } catch (error) {
+    console.error(error);
+    return errorResponse(res, 500, "Server error", error.message);
+  }
+};
+
+const getSimRacingCoordinates = async (req, res) => {
+  try {
+    const configuration = await Configuration.findOne().select(
+      "simRacingCoordinates"
+    );
+    return successResponse(
+      res,
+      200,
+      "Configuration fetched successfully",
+      configuration
     );
   } catch (error) {
     console.error(error);
@@ -853,4 +908,9 @@ module.exports = {
   getAllPOSAccess,
   deletePOSAccess,
   createNewSimRacingRig,
+  updateSimRacingRig,
+  deleteSimRacingRig,
+  getAllSimRacingRigs,
+  getSimRacingCoordinates,
+  updateSimRacingCoordinates,
 };

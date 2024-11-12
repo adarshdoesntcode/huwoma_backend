@@ -93,9 +93,32 @@ router
 
 router
   .route("/simracing")
+  .get(
+    verifyRoles(ROLES_LIST.superAdmin),
+    settingsController.getAllSimRacingRigs
+  )
   .post(
     verifyRoles(ROLES_LIST.superAdmin),
     settingsController.createNewSimRacingRig
+  )
+  .put(
+    verifyRoles(ROLES_LIST.superAdmin),
+    settingsController.updateSimRacingRig
+  )
+  .delete(
+    verifyRoles(ROLES_LIST.superAdmin),
+    settingsController.deleteSimRacingRig
+  );
+
+router
+  .route("/simracing/location")
+  .get(
+    verifyRoles(ROLES_LIST.superAdmin),
+    settingsController.getSimRacingCoordinates
+  )
+  .put(
+    verifyRoles(ROLES_LIST.superAdmin),
+    settingsController.updateSimRacingCoordinates
   );
 
 //====================PAYMENT MODE======================
