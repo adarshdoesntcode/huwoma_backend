@@ -24,9 +24,11 @@ connectDB();
 // Define routes
 app.use("/", require("./routes/api"));
 
+app.use("/api/startrace", require("./routes/client-sim-racing"));
+
 app.use("/api/auth", require("./routes/auth"));
 // app.use("/api/oauth", require("./routes/oauth"));
-app.use("/api/password-reset/", require("./routes/password-reset"));
+app.use("/api/password-reset", require("./routes/password-reset"));
 app.use("/api/pos-auth", require("./routes/pos"));
 
 app.use("/api/simracing", verifyJWT, require("./routes/simracing"));

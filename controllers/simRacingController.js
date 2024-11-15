@@ -5,6 +5,7 @@ const SimRacingTransaction = require("../models/SimRacingTransaction");
 const { errorResponse, successResponse } = require("./utils/reponse");
 const { generateBillNo, generateRaceBillNo } = require("./utils/utils");
 const PaymentMode = require("../models/PaymentMode");
+const Configuration = require("../models/Configuration");
 
 // ======================CUSTOMER=============================
 
@@ -623,6 +624,58 @@ const deleteTransaction = async (req, res) => {
   }
 };
 
+// ========================RACER UI=============================
+
+const clientStartRace = async (req, res) => {
+  try {
+    const { coordinates } = req.body;
+    console.log("🚀 ~ clientStartRace ~ coordinates:", coordinates);
+    if (!coordinates || !coordinates.longitude || !coordinates.latitude) {
+    }
+
+    const radiusInRadians = 100 / 6371000;
+
+    const configuration = await Configuration.findOne({
+      simRacingCoordinates: {
+        $geoWithin: {
+          $centerSphere: [
+            [coordinates.longitude, coordinates.latitude],
+            radiusInRadians,
+          ],
+        },
+      },
+    }).select("simRacingCoordinates");
+
+    if (!configuration) {
+      return errorResponse(res, 400, "Coordinates are not within 100 meters");
+    }
+
+    const key = req.header("simRacingKey");
+    if (!key) {
+      if (!req.body.id) {
+        return errorResponse(res, 400, "No id provided");
+      }
+      const rig = await SimRacingRig.findOne({
+        _id: req.body.id,
+        rigOperational: true,
+      });
+      if (!rig) {
+        return errorResponse(res, 404, "Rig not found");
+      }
+      if (rig.rigStatus === "On Track") {
+        return errorResponse(res, 400, "ROT");
+      }
+      return successResponse(res, 200, "RTR", rig);
+    } else {
+      const decoded = jwt.verify(key, process.env.SIM_RACING_SECRET);
+      req.simRacingId = decoded.id;
+    }
+  } catch (error) {
+    console.error(error);
+    return errorResponse(res, 401, "Invalid simRacingKey", error.message);
+  }
+};
+
 module.exports = {
   createCustomer,
   findCustomer,
@@ -635,4 +688,5 @@ module.exports = {
   raceStartFromBooking,
   getCheckoutDetails,
   simracingCheckout,
+  clientStartRace,
 };
