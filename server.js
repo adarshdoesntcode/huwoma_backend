@@ -25,6 +25,7 @@ connectDB();
 app.use("/", require("./routes/api"));
 
 app.use("/api/startrace", require("./routes/client-sim-racing"));
+app.use("/api/myrace", require("./routes/client-sim-racing"));
 
 app.use("/api/auth", require("./routes/auth"));
 // app.use("/api/oauth", require("./routes/oauth"));

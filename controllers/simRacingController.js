@@ -647,10 +647,14 @@ const clientStartRace = async (req, res) => {
     }).select("simRacingCoordinates");
 
     if (!configuration) {
-      return errorResponse(res, 400, "Coordinates are not within 100 meters");
+      return errorResponse(
+        res,
+        400,
+        "Your current location is not in the sim racing zone"
+      );
     }
 
-    const key = req.header("simRacingKey");
+    const key = req.headers.authorization;
     if (!key) {
       if (!req.body.id) {
         return errorResponse(res, 400, "No id provided");
@@ -663,16 +667,41 @@ const clientStartRace = async (req, res) => {
         return errorResponse(res, 404, "Rig not found");
       }
       if (rig.rigStatus === "On Track") {
-        return errorResponse(res, 400, "ROT");
+        return errorResponse(
+          res,
+          400,
+          "This Rig is already on track with another racer."
+        );
       }
       return successResponse(res, 200, "RTR", rig);
     } else {
-      const decoded = jwt.verify(key, process.env.SIM_RACING_SECRET);
-      req.simRacingId = decoded.id;
+      const token = key.split(" ")[1];
+      const decoded = jwt.verify(token, process.env.SIM_RACING_SECRET);
+      const rig = await SimRacingRig.findOne({
+        _id: req.body.id,
+        rigOperational: true,
+      });
+      if (!rig) {
+        return errorResponse(res, 404, "Rig not found");
+      }
+      if (
+        rig.activeRacer === decoded.customerId &&
+        rig.activeTransaction === decoded.transactionId
+      ) {
+        return successResponse(res, 200, "CTR");
+      }
+      if (rig.rigStatus === "On Track") {
+        return errorResponse(
+          res,
+          400,
+          "This Rig is already on track with another racer."
+        );
+      }
+      return successResponse(res, 200, "RTR", rig);
     }
   } catch (error) {
     console.error(error);
-    return errorResponse(res, 401, "Invalid simRacingKey", error.message);
+    return errorResponse(res, 500, "Server error", error.message);
   }
 };
 
@@ -739,6 +768,19 @@ const startRaceFromClient = async (req, res) => {
 
     await simRacingTransaction.save();
 
+    await SimRacingCustomer.findByIdAndUpdate(customer._id, {
+      $push: { customerTransactions: simRacingTransaction._id },
+    });
+
+    await SimRacingRig.findByIdAndUpdate(rigId, {
+      $set: {
+        activeRacer: customer._id,
+        activeTransaction: simRacingTransaction._id,
+        rigStatus: "On Track",
+      },
+      $push: { rigTransactions: simRacingTransaction._id },
+    });
+
     const tokenPayload = {
       transactionId: simRacingTransaction._id,
       customerId: customer._id,
@@ -746,8 +788,6 @@ const startRaceFromClient = async (req, res) => {
     };
 
     const token = jwt.sign(tokenPayload, process.env.SIM_RACING_SECRET);
-
-    // You can then include the token in the success response or use it as needed
 
     return successResponse(
       res,
@@ -769,6 +809,42 @@ const startRaceFromClient = async (req, res) => {
   }
 };
 
+const getTransactionForClient = async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return errorResponse(res, 401, "Unauthorized");
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    const decoded = jwt.verify(token, process.env.SIM_RACING_SECRET);
+
+    const transaction = await SimRacingTransaction.findOne({
+      _id: decoded.transactionId,
+      customer: decoded.customerId,
+      rig: decoded.rigId,
+      transactionStatus: "Active",
+    })
+      .populate("rig")
+      .populate("customer");
+
+    if (!transaction) {
+      return errorResponse(res, 401, "Unauthorized");
+    }
+
+    return successResponse(res, 200, "Transaction found", transaction);
+  } catch (error) {
+    console.error(error);
+    return errorResponse(
+      res,
+      500,
+      "Server error. Failed to verify transaction.",
+      error.message
+    );
+  }
+};
+
 module.exports = {
   createCustomer,
   findCustomer,
@@ -783,4 +859,5 @@ module.exports = {
   simracingCheckout,
   clientStartRace,
   startRaceFromClient,
+  getTransactionForClient,
 };
