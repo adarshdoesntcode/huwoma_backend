@@ -6,6 +6,7 @@ const { errorResponse, successResponse } = require("./utils/reponse");
 const { generateBillNo, generateRaceBillNo } = require("./utils/utils");
 const PaymentMode = require("../models/PaymentMode");
 const Configuration = require("../models/Configuration");
+const jwt = require("jsonwebtoken");
 
 // ======================CUSTOMER=============================
 
@@ -629,11 +630,10 @@ const deleteTransaction = async (req, res) => {
 const clientStartRace = async (req, res) => {
   try {
     const { coordinates } = req.body;
-    console.log("🚀 ~ clientStartRace ~ coordinates:", coordinates);
     if (!coordinates || !coordinates.longitude || !coordinates.latitude) {
     }
 
-    const radiusInRadians = 100 / 6371000;
+    const radiusInRadians = 150 / 6371000;
 
     const configuration = await Configuration.findOne({
       simRacingCoordinates: {
@@ -676,6 +676,99 @@ const clientStartRace = async (req, res) => {
   }
 };
 
+const startRaceFromClient = async (req, res) => {
+  try {
+    const { customerName, customerContact, rigId } = req.body;
+
+    const rig = await SimRacingRig.findOne({
+      _id: rigId,
+      rigStatus: "Pit Stop",
+    });
+    if (!rig) {
+      return errorResponse(res, 400, "Rig is not available");
+    }
+
+    let customer = await SimRacingCustomer.findOne({ customerContact });
+
+    if (!customer) {
+      customer = new SimRacingCustomer({ customerName, customerContact });
+      await customer.save();
+    }
+    const existingTransaction = await SimRacingTransaction.findOne({
+      customer: customer,
+      transactionStatus: {
+        $not: {
+          $in: ["Completed", "Cancelled"],
+        },
+      },
+      paymentStatus: {
+        $not: {
+          $in: ["Paid", "Cancelled"],
+        },
+      },
+    });
+
+    if (existingTransaction) {
+      return errorResponse(
+        res,
+        400,
+        "A transaction for the  customer already exists."
+      );
+    }
+
+    const now = new Date();
+    const raceStartDateObj = new Date(now);
+    const clientDate = now.toISOString();
+
+    let billNo;
+    let existingBillNo;
+
+    do {
+      billNo = generateRaceBillNo(clientDate);
+      existingBillNo = await SimRacingTransaction.findOne({ billNo });
+    } while (existingBillNo);
+
+    const simRacingTransaction = new SimRacingTransaction({
+      billNo,
+      rig: rigId,
+      customer: customer._id,
+      start: raceStartDateObj,
+      transactionStatus: "Active",
+      paymentStatus: "Pending",
+    });
+
+    await simRacingTransaction.save();
+
+    const tokenPayload = {
+      transactionId: simRacingTransaction._id,
+      customerId: customer._id,
+      rigId: rigId,
+    };
+
+    const token = jwt.sign(tokenPayload, process.env.SIM_RACING_SECRET);
+
+    // You can then include the token in the success response or use it as needed
+
+    return successResponse(
+      res,
+      201,
+      "Sim Racing transaction started successfully.",
+      {
+        simRacingTransaction,
+        simRacingKey: token,
+      }
+    );
+  } catch (error) {
+    console.error(error);
+    return errorResponse(
+      res,
+      500,
+      "Server error. Failed to start transaction.",
+      error.message
+    );
+  }
+};
+
 module.exports = {
   createCustomer,
   findCustomer,
@@ -689,4 +782,5 @@ module.exports = {
   getCheckoutDetails,
   simracingCheckout,
   clientStartRace,
+  startRaceFromClient,
 };
