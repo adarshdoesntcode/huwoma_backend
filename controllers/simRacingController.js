@@ -687,8 +687,8 @@ const clientStartRace = async (req, res) => {
       }
 
       if (
-        rig.activeRacer.toString() === decoded.customerId.toString() &&
-        rig.activeTransaction.toString() === decoded.transactionId.toString()
+        rig.activeRacer?.toString() === decoded.customerId?.toString() &&
+        rig.activeTransaction?.toString() === decoded.transactionId?.toString()
       ) {
         return successResponse(res, 200, "CTR");
       }
