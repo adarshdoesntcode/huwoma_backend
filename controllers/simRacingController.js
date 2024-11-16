@@ -681,12 +681,14 @@ const clientStartRace = async (req, res) => {
         _id: req.body.id,
         rigOperational: true,
       });
+
       if (!rig) {
         return errorResponse(res, 404, "Rig not found");
       }
+
       if (
-        rig.activeRacer === decoded.customerId &&
-        rig.activeTransaction === decoded.transactionId
+        rig.activeRacer.toString() === decoded.customerId.toString() &&
+        rig.activeTransaction.toString() === decoded.transactionId.toString()
       ) {
         return successResponse(res, 200, "CTR");
       }
