@@ -7,6 +7,7 @@ const { generateBillNo, generateRaceBillNo } = require("./utils/utils");
 const PaymentMode = require("../models/PaymentMode");
 const Configuration = require("../models/Configuration");
 const jwt = require("jsonwebtoken");
+const { get } = require("mongoose");
 
 // ======================CUSTOMER=============================
 
@@ -66,6 +67,103 @@ const findCustomer = async (req, res) => {
       "Customer retrieved successfully",
       customer
     );
+  } catch (error) {
+    return errorResponse(res, 500, "Server error", error.message);
+  }
+};
+
+const getAllCustomers = async (req, res) => {
+  try {
+    const customers = await SimRacingCustomer.aggregate([
+      {
+        $lookup: {
+          from: "simracingtransactions",
+          localField: "customerTransactions",
+          foreignField: "_id",
+          as: "transactions",
+        },
+      },
+      {
+        $addFields: {
+          totalNetAmount: {
+            $sum: "$transactions.netAmount",
+          },
+        },
+      },
+      {
+        $sort: { createdAt: -1 },
+      },
+    ]);
+
+    return successResponse(
+      res,
+      200,
+      "Customers retrieved successfully",
+      customers
+    );
+  } catch (error) {
+    return errorResponse(res, 500, "Server error", error.message);
+  }
+};
+
+const getCustomerById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return errorResponse(res, 400, "Id is required.");
+    }
+
+    const customer = await SimRacingCustomer.findById(id).populate({
+      path: "customerTransactions",
+      populate: [
+        {
+          path: "rig",
+        },
+        { path: "customer" },
+        { path: "paymentMode" },
+      ],
+      options: { sort: { createdAt: -1 } },
+    });
+
+    if (!customer) {
+      return errorResponse(res, 404, "Customer not found");
+    }
+
+    return successResponse(
+      res,
+      200,
+      "Customer retrieved successfully",
+      customer
+    );
+  } catch (error) {
+    return errorResponse(res, 500, "Server error", error.message);
+  }
+};
+
+const updateSimracingCustomer = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { customerName, customerContact } = req.body;
+
+    if (!id || !customerName || !customerContact) {
+      return errorResponse(
+        res,
+        400,
+        "Id, customerName, and customerContact are required."
+      );
+    }
+
+    const customer = await SimRacingCustomer.findByIdAndUpdate(id, {
+      customerName,
+      customerContact,
+    });
+
+    if (!customer) {
+      return errorResponse(res, 404, "Customer not found");
+    }
+
+    return successResponse(res, 200, "Customer updated successfully", customer);
   } catch (error) {
     return errorResponse(res, 500, "Server error", error.message);
   }
@@ -862,4 +960,7 @@ module.exports = {
   clientStartRace,
   startRaceFromClient,
   getTransactionForClient,
+  getAllCustomers,
+  getCustomerById,
+  updateSimracingCustomer,
 };

@@ -20,6 +20,24 @@ router
     simRacingController.createCustomer
   );
 
+router
+  .route("/customers")
+  .get(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    simRacingController.getAllCustomers
+  );
+
+router
+  .route("/customer/:id")
+  .get(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    simRacingController.getCustomerById
+  )
+  .put(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    simRacingController.updateSimracingCustomer
+  );
+
 // ======================RIG=============================
 
 router
