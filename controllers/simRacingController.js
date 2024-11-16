@@ -633,7 +633,7 @@ const clientStartRace = async (req, res) => {
     if (!coordinates || !coordinates.longitude || !coordinates.latitude) {
     }
 
-    const radiusInRadians = 150 / 6371000;
+    const radiusInRadians = 100 / 6371000;
 
     const configuration = await Configuration.findOne({
       simRacingCoordinates: {
@@ -650,7 +650,7 @@ const clientStartRace = async (req, res) => {
       return errorResponse(
         res,
         400,
-        "Your current location is not in the sim racing zone"
+        "Your current location is not in the sim racing area"
       );
     }
 
