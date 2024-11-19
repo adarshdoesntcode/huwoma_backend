@@ -27,10 +27,6 @@ const adminSchema = new Schema(
     },
     refreshToken: String,
     OTP: String,
-    timeStamps: {
-      type: Date,
-      timestamps: true,
-    },
   },
   {
     timestamps: true,

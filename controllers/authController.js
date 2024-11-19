@@ -8,30 +8,40 @@ const {
   setCookie,
 } = require("./utils/token");
 const { errorResponse, successResponse } = require("./utils/reponse");
+const { sendEmail } = require("./mailController");
+const roleList = require("../config/roleList");
 
 const handleNewAdmin = async (req, res) => {
-  const { fullname, email, phoneNumber, role } = req.body;
+  const { fullname, email, phoneNumber, role, confirmPassword, password } =
+    req.body;
 
-  if (!fullname || !email || !phoneNumber || !role)
-    return res.status(400).json({
-      message: "All credentials are required",
-    });
+  if (
+    !fullname ||
+    !email ||
+    !phoneNumber ||
+    !role ||
+    !password ||
+    !confirmPassword
+  )
+    return errorResponse(res, 400, "All credentials are required");
 
   let duplicate;
 
   duplicate = await Admin.findOne({ email: email });
 
-  if (duplicate)
-    return res.status(409).json({
-      message: "Duplicate Credentials.",
-    });
+  if (duplicate) return errorResponse(res, 409, "Duplicate Credentials.");
+
+  if (password !== confirmPassword) {
+    return errorResponse(
+      res,
+      400,
+      "New password and confirm password do not match"
+    );
+  }
 
   try {
-    const password = "huwoma@123";
     const hashedPassword = await bcrypt.hash(password, 10);
-    let result;
-
-    result = await Admin.create({
+    await Admin.create({
       fullname: fullname,
       email: email,
       password: hashedPassword,
@@ -39,14 +49,90 @@ const handleNewAdmin = async (req, res) => {
       role: [role],
     });
 
-    res.status(201).json({
-      message: `New User ${fullname} has been created!`,
-      data: result,
+    await sendEmail({
+      to: email,
+      subject: "New Admin Huwoma",
+      text: `Hi ${fullname},
+      Role: ${role === 4200 ? "Admin" : "Super Admin"}
+
+      Your account has been created. Please login with the following credentials:
+
+      Email: ${email}
+      Password: ${password}
+
+      Please reset your password as soon as possible.
+      
+      Thank You.
+      `,
+      fromName: "Huwoma",
     });
+
+    successResponse(res, 201, `New Admin ${fullname} has been created!`);
   } catch (err) {
-    res.status(500).json({
-      message: err.message,
+    errorResponse(res, 500, err.message);
+  }
+};
+
+const getAllAdmins = async (req, res) => {
+  try {
+    const admins = await Admin.find().select("-password -refreshToken -OTP");
+    return successResponse(res, 200, "All Admins", admins);
+  } catch (err) {
+    return errorResponse(res, 500, err.message);
+  }
+};
+
+const handleUpdateAdmin = async (req, res) => {
+  const { adminId, fullname, email, phoneNumber, role } = req.body;
+
+  try {
+    const adminToUpdate = await Admin.findById(adminId);
+
+    if (!adminToUpdate) {
+      return errorResponse(res, 404, "Admin not found.");
+    }
+
+    if (fullname) adminToUpdate.fullname = fullname;
+    if (email) adminToUpdate.email = email;
+    if (phoneNumber) adminToUpdate.phoneNumber = phoneNumber;
+    if (role) adminToUpdate.role = role;
+
+    await adminToUpdate.save();
+
+    return successResponse(res, 200, "Admin updated successfully");
+  } catch (err) {
+    return errorResponse(res, 500, err.message);
+  }
+};
+
+const handleDeleteAdmin = async (req, res) => {
+  try {
+    const { adminId } = req.body;
+
+    const adminToDelete = await Admin.findById(adminId);
+
+    if (!adminToDelete) {
+      return errorResponse(res, 404, "Admin not found.");
+    }
+
+    const superAdmins = await Admin.countDocuments({
+      role: { $in: [roleList.superAdmin] },
     });
+
+    if (superAdmins <= 1 && adminToDelete.role.includes(roleList.superAdmin)) {
+      return errorResponse(res, 403, "Cannot delete the last Super Admin.");
+    }
+
+    await Admin.findByIdAndDelete(adminId);
+
+    return successResponse(
+      res,
+      200,
+      "Admin deleted successfully!",
+      adminToDelete
+    );
+  } catch (err) {
+    return errorResponse(res, 500, `Error: ${err.message}`);
   }
 };
 
@@ -195,7 +281,14 @@ const handleRefreshToken = async (req, res) => {
 
 const updateAdminProfile = async (req, res) => {
   const { id } = req.params;
-  const { fullname, currentPassword, newPassword, confirmPassword } = req.body;
+  const {
+    fullname,
+    email,
+    phoneNumber,
+    currentPassword,
+    newPassword,
+    confirmPassword,
+  } = req.body;
 
   try {
     const admin = await Admin.findById(id);
@@ -212,6 +305,25 @@ const updateAdminProfile = async (req, res) => {
         res,
         200,
         "Fullname updated successfully",
+        adminData
+      );
+    }
+
+    if (email) {
+      admin.email = email;
+      await admin.save();
+      const { password, refreshToken, ...adminData } = admin.toObject();
+      return successResponse(res, 200, "Email updated successfully", adminData);
+    }
+
+    if (phoneNumber) {
+      admin.phoneNumber = phoneNumber;
+      await admin.save();
+      const { password, refreshToken, ...adminData } = admin.toObject();
+      return successResponse(
+        res,
+        200,
+        "Phone number updated successfully",
         adminData
       );
     }
@@ -254,4 +366,7 @@ module.exports = {
   handleLogout,
   handleRefreshToken,
   updateAdminProfile,
+  getAllAdmins,
+  handleDeleteAdmin,
+  handleUpdateAdmin,
 };

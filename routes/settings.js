@@ -8,7 +8,17 @@ const authController = require("../controllers/authController");
 //====================GENERAL======================
 router
   .route("/general/:id")
-  .put(verifyRoles(ROLES_LIST.superAdmin), authController.updateAdminProfile);
+  .put(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    authController.updateAdminProfile
+  );
+
+router
+  .route("/admins")
+  .get(verifyRoles(ROLES_LIST.superAdmin), authController.getAllAdmins)
+  .post(verifyRoles(ROLES_LIST.superAdmin), authController.handleNewAdmin)
+  .delete(verifyRoles(ROLES_LIST.superAdmin), authController.handleDeleteAdmin)
+  .put(verifyRoles(ROLES_LIST.superAdmin), authController.handleUpdateAdmin);
 
 //====================VEHICLE TYPE======================
 
@@ -18,7 +28,10 @@ router
     verifyRoles(ROLES_LIST.superAdmin),
     settingsController.createVehicleType
   )
-  .get(verifyRoles(ROLES_LIST.superAdmin), settingsController.getAllVehicleType)
+  .get(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    settingsController.getAllVehicleType
+  )
   .put(verifyRoles(ROLES_LIST.superAdmin), settingsController.updateVehicleType)
   .delete(
     verifyRoles(ROLES_LIST.superAdmin),
@@ -68,7 +81,7 @@ router
 router
   .route("/carwash/inspection")
   .get(
-    verifyRoles(ROLES_LIST.superAdmin),
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
     settingsController.getInspectionTemplate
   )
   .post(
@@ -94,7 +107,7 @@ router
 router
   .route("/simracing")
   .get(
-    verifyRoles(ROLES_LIST.superAdmin),
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
     settingsController.getAllSimRacingRigs
   )
   .post(
@@ -113,7 +126,7 @@ router
 router
   .route("/simracing/location")
   .get(
-    verifyRoles(ROLES_LIST.superAdmin),
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
     settingsController.getSimRacingCoordinates
   )
   .put(
@@ -129,7 +142,10 @@ router
     verifyRoles(ROLES_LIST.superAdmin),
     settingsController.createPaymentMode
   )
-  .get(verifyRoles(ROLES_LIST.superAdmin), settingsController.getAllPaymentMode)
+  .get(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    settingsController.getAllPaymentMode
+  )
   .delete(
     verifyRoles(ROLES_LIST.superAdmin),
     settingsController.deletePaymentMode
@@ -143,7 +159,10 @@ router
 
 router
   .route("/pos-access")
-  .get(verifyRoles(ROLES_LIST.superAdmin), settingsController.getAllPOSAccess)
+  .get(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    settingsController.getAllPOSAccess
+  )
   .post(verifyRoles(ROLES_LIST.superAdmin), settingsController.createPOSAccess);
 
 router
