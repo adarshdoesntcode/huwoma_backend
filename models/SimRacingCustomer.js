@@ -26,5 +26,6 @@ const SimRacingCustomerSchema = new Schema(
     timestamps: true,
   }
 );
+SimRacingCustomerSchema.index({ customerContact: 1 }, { unique: true });
 
 module.exports = mongoose.model("SimRacingCustomer", SimRacingCustomerSchema);

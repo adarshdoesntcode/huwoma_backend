@@ -212,12 +212,12 @@ const getCarwashTransactions = async (req, res) => {
                 $lt: endOfDay,
               },
             },
-            {
-              "service.end": {
-                $gte: startOfDay,
-                $lt: endOfDay,
-              },
-            },
+            // {
+            //   "service.end": {
+            //     $gte: startOfDay,
+            //     $lt: endOfDay,
+            //   },
+            // },
           ],
         },
         {

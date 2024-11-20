@@ -27,4 +27,6 @@ const CarWashCustomerSchema = new Schema(
   }
 );
 
+CarWashCustomerSchema.index({ customerContact: 1 }, { unique: true });
+
 module.exports = mongoose.model("CarWashCustomer", CarWashCustomerSchema);

@@ -7,7 +7,6 @@ const { generateBillNo, generateRaceBillNo } = require("./utils/utils");
 const PaymentMode = require("../models/PaymentMode");
 const Configuration = require("../models/Configuration");
 const jwt = require("jsonwebtoken");
-const { get } = require("mongoose");
 
 // ======================CUSTOMER=============================
 
@@ -574,7 +573,6 @@ const simracingCheckout = async (req, res) => {
     const {
       transactionId,
       paymentMode,
-
       grossAmount,
       discountAmount,
       netAmount,
