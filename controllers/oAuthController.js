@@ -54,12 +54,10 @@ const updateUserDetails = async (userModel, googleUser, refreshToken) => {
     },
     {
       email: googleUser.email,
-      fullname: googleUser.name,
       photo: googleUser.picture,
       refreshToken: refreshToken,
     },
     {
-      upsert: true,
       new: true,
     }
   );

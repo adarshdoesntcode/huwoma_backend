@@ -209,7 +209,7 @@ const getServiceType = async (req, res) => {
       serviceTypeOperational: true,
       serviceVehicle: vehicleTypeId,
     }).select(
-      "-__v -createdAt -updatedAt -serviceVehicle -serviceTypeOperational"
+      "-__v -createdAt -updatedAt -serviceVehicle -serviceTypeOperational -serviceTransactions"
     );
 
     if (activeServiceTypes.length === 0) {
