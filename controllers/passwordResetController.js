@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const roleList = require("../config/roleList");
+const nodemailer = require("nodemailer");
 
 const Admin = require("../models/Admin");
 const { createAccessToken } = require("./utils/token");
@@ -71,7 +72,6 @@ const forgotPassword = async (req, res) => {
         console.log(error);
         res.status(500).send("Error sending email");
       } else {
-        console.log(`Email sent: ${info.response}`);
         res.status(200).json({ accessToken });
       }
     });
@@ -139,7 +139,6 @@ const matchOTP = async (req, res) => {
 };
 
 const passwordReset = async (req, res) => {
-  console.log(req.body);
   const { password } = req.body;
   const authHeader = req.headers.authorization || req.headers.Authorization;
   if (!authHeader?.startsWith("Bearer ")) return res.sendStatus(401); //Unauthorized

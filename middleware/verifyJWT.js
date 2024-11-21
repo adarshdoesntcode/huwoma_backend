@@ -25,17 +25,17 @@ const verifyJWT = (req, res, next) => {
       if (role.includes(roleList.admin) || role.includes(roleList.superAdmin)) {
         freshUser = await Admin.findOne({ email });
       } else {
-        return res.sendStatus(400); // Bad request if role doesn't match
+        return res.sendStatus(400);
       }
 
-      if (!freshUser) return res.sendStatus(404); // Not found if no user is found
+      if (!freshUser) return res.sendStatus(404);
 
       req.email = email;
       req.role = role;
       req.userId = freshUser._id;
       next();
     } catch (error) {
-      return res.sendStatus(500); // Internal server error
+      return res.sendStatus(500);
     }
   });
 };

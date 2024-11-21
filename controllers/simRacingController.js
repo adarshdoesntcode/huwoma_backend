@@ -573,6 +573,7 @@ const simracingCheckout = async (req, res) => {
     const {
       transactionId,
       paymentMode,
+
       grossAmount,
       discountAmount,
       netAmount,
@@ -746,7 +747,7 @@ const clientStartRace = async (req, res) => {
       return errorResponse(
         res,
         400,
-        "Your current location is not in the sim racing area"
+        "Your current location is not in the SimRacing area"
       );
     }
 
@@ -763,11 +764,7 @@ const clientStartRace = async (req, res) => {
         return errorResponse(res, 404, "Rig not found");
       }
       if (rig.rigStatus === "On Track") {
-        return errorResponse(
-          res,
-          400,
-          "This Rig is already on track with another racer."
-        );
+        return errorResponse(res, 400, "This Rig is currently not available.");
       }
       return successResponse(res, 200, "RTR", rig);
     } else {
@@ -789,11 +786,7 @@ const clientStartRace = async (req, res) => {
         return successResponse(res, 200, "CTR");
       }
       if (rig.rigStatus === "On Track") {
-        return errorResponse(
-          res,
-          400,
-          "This Rig is already on track with another racer."
-        );
+        return errorResponse(res, 400, "This Rig is currently not available.");
       }
       return successResponse(res, 200, "RTR", rig);
     }

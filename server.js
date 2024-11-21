@@ -28,7 +28,7 @@ app.use("/api/startrace", require("./routes/client-sim-racing"));
 app.use("/api/myrace", require("./routes/client-sim-racing"));
 
 app.use("/api/auth", require("./routes/auth"));
-// app.use("/api/oauth", require("./routes/oauth"));
+app.use("/api/oauth", require("./routes/oauth"));
 app.use("/api/password-reset", require("./routes/password-reset"));
 app.use("/api/pos-auth", require("./routes/pos"));
 
