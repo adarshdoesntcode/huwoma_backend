@@ -90,10 +90,7 @@ router
 
 router
   .route("/transaction/:id")
-  // .get(
-  //   verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
-  //   simRacingController.getTransactionForInspection
-  // )
+
   .put(
     verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
     simRacingController.cancelRace

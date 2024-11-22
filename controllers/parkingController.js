@@ -2,6 +2,8 @@ const { default: mongoose } = require("mongoose");
 const ParkingTransaction = require("../models/ParkingTransaction");
 const ParkingVehicleType = require("../models/ParkingVehicleType");
 const PaymentMode = require("../models/PaymentMode");
+const { successResponse, errorResponse } = require("./utils/reponse");
+const { generateParkingBillNo } = require("./utils/utils");
 
 const getAvailableVehicles = async (req, res) => {
   try {
@@ -24,6 +26,61 @@ const getAvailableVehicles = async (req, res) => {
   }
 };
 
+const getParkingTransactions = async (req, res) => {
+  try {
+    const now = new Date();
+    const nowDateObj = new Date(now);
+
+    const startOfDay = new Date(nowDateObj);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(nowDateObj);
+    endOfDay.setUTCHours(23, 59, 59, 999);
+
+    const operationalVehicles = await ParkingVehicleType.find({
+      vehicleTypeOperational: true,
+    });
+
+    const transactions = await ParkingTransaction.find({
+      $or: [
+        {
+          $or: [
+            {
+              createdAt: {
+                $gte: startOfDay,
+                $lt: endOfDay,
+              },
+            },
+            {
+              transactionTime: {
+                $gte: startOfDay,
+                $lt: endOfDay,
+              },
+            },
+          ],
+        },
+        {
+          $or: [{ transactionStatus: "Parked" }, { paymentStatus: "Pending" }],
+        },
+      ],
+    })
+      .sort({ createdAt: -1 })
+      .populate("vehicle")
+      .populate("paymentMode");
+    return successResponse(
+      res,
+      200,
+      "Parking transactions retrieved successfully",
+      {
+        vehicles: operationalVehicles,
+        transactions,
+      }
+    );
+  } catch (error) {
+    console.error(error);
+    return errorResponse(res, 500, "Server error", error.message);
+  }
+};
 const parkingStart = async (req, res) => {
   const session = await ParkingTransaction.startSession();
 
@@ -64,7 +121,7 @@ const parkingStart = async (req, res) => {
     // Generate unique bill number
     if (!billNo) {
       do {
-        billNo = generateRaceBillNo(clientDate);
+        billNo = generateParkingBillNo(clientDate);
         existingBillNo = await ParkingTransaction.findOne({ billNo }).session(
           session
         );
@@ -100,6 +157,7 @@ const parkingStart = async (req, res) => {
     const parkingTransaction = new ParkingTransaction({
       billNo,
       vehicle: vehicleId,
+      vehicleNumber: vehicleNumber,
       start: parkingStartDateObj,
       transactionStatus: "Parked",
       paymentStatus: "Pending",
@@ -269,9 +327,62 @@ const parkingCheckout = async (req, res) => {
   }
 };
 
+const deleteParkingTransaction = async (req, res) => {
+  const { transactionId } = req.params;
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const transaction = await ParkingTransaction.findByIdAndUpdate(
+      transactionId,
+      {
+        transactionStatus: "Cancelled",
+        paymentStatus: "Cancelled",
+      },
+      {
+        session,
+        new: true,
+      }
+    );
+
+    if (!transaction) {
+      await session.abortTransaction();
+      session.endSession();
+      return errorResponse(res, 404, "Transaction not found.");
+    }
+
+    await ParkingVehicleType.findByIdAndUpdate(
+      transaction.vehicle,
+      {
+        $inc: { currentlyAccomodated: -1 },
+      },
+      { session }
+    );
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return successResponse(res, 200, "Transaction deleted successfully.");
+  } catch (err) {
+    console.error(err);
+    if (session) {
+      await session.abortTransaction();
+      session.endSession();
+    }
+    return errorResponse(
+      res,
+      500,
+      "Server error. Failed to delete transaction."
+    );
+  }
+};
+
 module.exports = {
   getAvailableVehicles,
   parkingStart,
   getCheckoutDetails,
   parkingCheckout,
+  getParkingTransactions,
+  deleteParkingTransaction,
 };

@@ -5,7 +5,7 @@ const ParkingTransactionSchema = new Schema(
   {
     vehicle: {
       type: Schema.Types.ObjectId,
-      ref: "ParkingVehicle",
+      ref: "ParkingVehicleType",
     },
     start: {
       type: Date,

@@ -326,7 +326,7 @@ const getSimracingTransactions = async (req, res) => {
           $or: [
             {
               transactionStatus: {
-                $in: ["Active"],
+                $in: ["Active", "Booked"],
               },
             },
             { paymentStatus: "Pending" },
