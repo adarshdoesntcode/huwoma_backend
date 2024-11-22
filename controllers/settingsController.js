@@ -9,6 +9,7 @@ const { errorResponse, successResponse } = require("./utils/reponse");
 
 const POSAccess = require("../models/POSAccess");
 const SimRacingRig = require("../models/SimRacingRig");
+const ParkingVehicleType = require("../models/ParkingVehicleType");
 
 //====================VEHICLE TYPE======================
 
@@ -713,6 +714,123 @@ const getSimRacingCoordinates = async (req, res) => {
   }
 };
 
+// =======================PARKING=======================
+
+const getAllParkingVehicles = async (req, res) => {
+  try {
+    const parkingVehicles = await ParkingVehicleType.find({
+      vehicleTypeOperational: true,
+    });
+
+    if (parkingVehicles.length === 0) {
+      return errorResponse(res, 204, "No parking vehicles available");
+    }
+
+    return successResponse(
+      res,
+      200,
+      "Parking vehicles fetched successfully",
+      parkingVehicles
+    );
+  } catch (error) {
+    console.error(error);
+    return errorResponse(res, 500, "Server error", error.message);
+  }
+};
+
+const createParkingVehicleType = async (req, res) => {
+  try {
+    const {
+      vehicleTypeName,
+      rate,
+      vehicleIcon,
+      billAbbreviation,
+      totalAccomodationCapacity,
+    } = req.body;
+
+    if (
+      !vehicleTypeName ||
+      !rate ||
+      !billAbbreviation ||
+      !totalAccomodationCapacity
+    ) {
+      return errorResponse(res, 400, "Please fill all required fields");
+    }
+
+    const newParkingVehicleType = new ParkingVehicleType({
+      vehicleTypeName,
+      rate,
+      vehicleIcon,
+      billAbbreviation,
+      totalAccomodationCapacity,
+      currentlyAccomodated: 0,
+    });
+
+    const savedParkingVehicleType = await newParkingVehicleType.save();
+
+    return successResponse(
+      res,
+      201,
+      "Parking vehicle type created successfully!",
+      savedParkingVehicleType
+    );
+  } catch (error) {
+    console.error(error);
+    return errorResponse(res, 500, "Server error", error.message);
+  }
+};
+
+const updateParkingVehicleType = async (req, res) => {
+  const { vehicleTypeId, updates } = req.body;
+
+  try {
+    const updatedParkingVehicleType = await ParkingVehicleType.findOneAndUpdate(
+      { _id: vehicleTypeId, vehicleTypeOperational: true },
+      updates,
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedParkingVehicleType) {
+      return errorResponse(res, 404, "Parking vehicle type not found");
+    }
+
+    return successResponse(
+      res,
+      200,
+      "Parking vehicle type updated successfully",
+      updatedParkingVehicleType
+    );
+  } catch (error) {
+    console.error(error);
+    return errorResponse(res, 500, "Server error", error.message);
+  }
+};
+
+const deleteParkingVehicleType = async (req, res) => {
+  const { vehicleTypeId } = req.body;
+
+  try {
+    const vehicleType = await ParkingVehicleType.findOneAndUpdate(
+      { _id: vehicleTypeId, vehicleTypeOperational: true },
+      { vehicleTypeOperational: false },
+      { new: true, runValidators: true }
+    );
+
+    if (!vehicleType) {
+      return errorResponse(res, 404, "Parking vehicle type not found");
+    }
+
+    return successResponse(
+      res,
+      200,
+      "Parking vehicle type deactivated successfully",
+      vehicleType
+    );
+  } catch (error) {
+    console.error(error);
+    return errorResponse(res, 500, "Server error", error.message);
+  }
+};
 //====================PAYMENT MODE======================
 
 const createPaymentMode = async (req, res) => {
@@ -913,4 +1031,8 @@ module.exports = {
   getAllSimRacingRigs,
   getSimRacingCoordinates,
   updateSimRacingCoordinates,
+  getAllParkingVehicles,
+  createParkingVehicleType,
+  updateParkingVehicleType,
+  deleteParkingVehicleType,
 };

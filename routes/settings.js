@@ -134,6 +134,27 @@ router
     settingsController.updateSimRacingCoordinates
   );
 
+//====================PARKING======================
+
+router
+  .route("/parking")
+  .get(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    settingsController.getAllParkingVehicles
+  )
+  .post(
+    verifyRoles(ROLES_LIST.superAdmin),
+    settingsController.createParkingVehicleType
+  )
+  .put(
+    verifyRoles(ROLES_LIST.superAdmin),
+    settingsController.updateParkingVehicleType
+  )
+  .delete(
+    verifyRoles(ROLES_LIST.superAdmin),
+    settingsController.deleteParkingVehicleType
+  );
+
 //====================PAYMENT MODE======================
 
 router

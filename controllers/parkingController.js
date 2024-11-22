@@ -1,5 +1,7 @@
+const { default: mongoose } = require("mongoose");
 const ParkingTransaction = require("../models/ParkingTransaction");
 const ParkingVehicleType = require("../models/ParkingVehicleType");
+const PaymentMode = require("../models/PaymentMode");
 
 const getAvailableVehicles = async (req, res) => {
   try {
@@ -23,7 +25,11 @@ const getAvailableVehicles = async (req, res) => {
 };
 
 const parkingStart = async (req, res) => {
+  const session = await ParkingTransaction.startSession();
+
   try {
+    session.startTransaction();
+
     const { vehicleId, vehicleNumber } = req.body;
 
     const now = new Date();
@@ -33,13 +39,39 @@ const parkingStart = async (req, res) => {
     let billNo;
     let existingBillNo;
 
+    // Find the vehicle
+    const vehicle = await ParkingVehicleType.findById(vehicleId).session(
+      session
+    );
+
+    if (!vehicle) {
+      await session.abortTransaction();
+      session.endSession();
+      return errorResponse(res, 404, "Vehicle not found.");
+    }
+
+    // Check parking capacity
+    if (vehicle.currentlyAccomodated >= vehicle.totalAccomodationCapacity) {
+      await session.abortTransaction();
+      session.endSession();
+      return errorResponse(
+        res,
+        400,
+        "No parking space available for the given vehicle."
+      );
+    }
+
+    // Generate unique bill number
     if (!billNo) {
       do {
         billNo = generateRaceBillNo(clientDate);
-        existingBillNo = await ParkingTransaction.findOne({ billNo });
+        existingBillNo = await ParkingTransaction.findOne({ billNo }).session(
+          session
+        );
       } while (existingBillNo);
     }
 
+    // Check if there's an existing active transaction for the vehicle
     const existingTransaction = await ParkingTransaction.findOne({
       vehicleNumber: vehicleNumber,
       transactionStatus: {
@@ -52,9 +84,11 @@ const parkingStart = async (req, res) => {
           $in: ["Paid", "Cancelled"],
         },
       },
-    });
+    }).session(session);
 
     if (existingTransaction) {
+      await session.abortTransaction();
+      session.endSession();
       return errorResponse(
         res,
         400,
@@ -62,6 +96,7 @@ const parkingStart = async (req, res) => {
       );
     }
 
+    // Create new parking transaction
     const parkingTransaction = new ParkingTransaction({
       billNo,
       vehicle: vehicleId,
@@ -69,11 +104,21 @@ const parkingStart = async (req, res) => {
       transactionStatus: "Parked",
       paymentStatus: "Pending",
     });
-    await parkingTransaction.save();
 
-    await ParkingVehicleType.findByIdAndUpdate(vehicleId, {
-      $push: { parkingTransactions: parkingTransaction._id },
-    });
+    await parkingTransaction.save({ session });
+
+    // Update vehicle's current accommodation and transactions
+    await ParkingVehicleType.findByIdAndUpdate(
+      vehicleId,
+      {
+        $inc: { currentlyAccomodated: 1 },
+        $push: { parkingTransactions: parkingTransaction._id },
+      },
+      { session }
+    );
+
+    await session.commitTransaction();
+    session.endSession();
 
     return successResponse(
       res,
@@ -82,6 +127,8 @@ const parkingStart = async (req, res) => {
       parkingTransaction
     );
   } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
     console.error(err);
     return errorResponse(
       res,
@@ -91,7 +138,45 @@ const parkingStart = async (req, res) => {
   }
 };
 
+const getCheckoutDetails = async (req, res) => {
+  try {
+    const { transactionId } = req.params;
+
+    const transaction = await ParkingTransaction.findOne({
+      _id: transactionId,
+      transactionStatus: "Parked",
+      paymentStatus: "Pending",
+    }).populate("vehicle");
+
+    if (!transaction) {
+      return errorResponse(res, 404, "Transaction not found.");
+    }
+
+    const paymentModes = await PaymentMode.find({
+      paymentModeOperational: true,
+    });
+
+    return successResponse(
+      res,
+      200,
+      "Checkout details retrieved successfully.",
+      {
+        transaction,
+        paymentModes,
+      }
+    );
+  } catch (err) {
+    console.error(err);
+    return errorResponse(
+      res,
+      500,
+      "Server error. Failed to retrieve checkout details."
+    );
+  }
+};
+
 const parkingCheckout = async (req, res) => {
+  let session;
   try {
     const {
       transactionId,
@@ -102,6 +187,9 @@ const parkingCheckout = async (req, res) => {
     } = req.body;
     const now = new Date();
     const parkingEndDateObj = new Date(now);
+
+    session = await mongoose.startSession();
+    session.startTransaction();
 
     const transaction = await ParkingTransaction.findOneAndUpdate(
       {
@@ -117,31 +205,49 @@ const parkingCheckout = async (req, res) => {
         end: parkingEndDateObj,
         discountAmount: discountAmount,
         netAmount: netAmount,
-        transactionTime: raceEndDateObj,
+        transactionTime: parkingEndDateObj,
       },
       {
         new: true,
+        session,
       }
     );
 
     if (!transaction) {
+      await session.abortTransaction();
+      session.endSession();
       return errorResponse(res, 404, "Transaction not found.");
     }
-    await SimRacingRig.findByIdAndUpdate(transaction.rig, {
-      $unset: {
-        activeRacer: "",
-        activeTransaction: "",
-      },
-      $set: {
-        rigStatus: "Pit Stop",
-      },
-    });
 
-    await PaymentMode.findByIdAndUpdate(paymentMode, {
-      $push: {
-        simRacingTransactions: transactionId,
+    await ParkingVehicleType.findByIdAndUpdate(
+      transaction.vehicle,
+      {
+        $inc: { currentlyAccomodated: -1 },
       },
-    });
+      { session }
+    );
+
+    const paymentModeExists = await PaymentMode.findById(paymentMode).session(
+      session
+    );
+    if (!paymentModeExists) {
+      await session.abortTransaction();
+      session.endSession();
+      return errorResponse(res, 404, "Payment mode not found.");
+    }
+
+    await PaymentMode.findByIdAndUpdate(
+      paymentMode,
+      {
+        $push: {
+          parkingTransactions: transactionId,
+        },
+      },
+      { session }
+    );
+
+    await session.commitTransaction();
+    session.endSession();
 
     return successResponse(
       res,
@@ -151,6 +257,10 @@ const parkingCheckout = async (req, res) => {
     );
   } catch (err) {
     console.error(err);
+    if (session) {
+      await session.abortTransaction();
+      session.endSession();
+    }
     return errorResponse(
       res,
       500,
@@ -162,4 +272,6 @@ const parkingCheckout = async (req, res) => {
 module.exports = {
   getAvailableVehicles,
   parkingStart,
+  getCheckoutDetails,
+  parkingCheckout,
 };

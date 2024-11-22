@@ -19,6 +19,15 @@ const ParkingVehicleTypeSchema = new Schema(
       type: String,
       required: true,
     },
+    totalAccomodationCapacity: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    currentlyAccomodated: {
+      type: Number,
+      min: 0,
+    },
     vehicleTypeOperational: {
       type: Boolean,
       default: true,
