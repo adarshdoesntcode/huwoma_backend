@@ -187,13 +187,16 @@ const handleLogin = async (req, res) => {
       if (!refreshToken)
         return res.status(400).send("Refresh Token creation fail");
 
-      foundUser.refreshToken = refreshToken;
+      foundUser.refreshTokens.push({
+        token: refreshToken,
+        createdAt: new Date(),
+      });
       const result = await foundUser.save();
 
       setCookie(res, refreshToken);
 
       foundUser.password = undefined;
-      foundUser.refreshToken = undefined;
+      foundUser.refreshTokens = undefined;
 
       return res.status(200).json({
         accessToken,
@@ -213,32 +216,40 @@ const handleLogin = async (req, res) => {
 const handleLogout = async (req, res) => {
   const cookies = req.cookies;
 
-  if (!cookies?.jwt) return res.sendStatus(204); //No Content
+  if (!cookies?.jwt) return res.sendStatus(204); // No Content
 
   const refreshToken = cookies.jwt;
 
-  // check for user found or not
-  const foundUser = await Admin.findOne({ refreshToken });
+  // Check if user exists with the provided refresh token
+  const foundUser = await Admin.findOne({
+    "refreshTokens.token": refreshToken,
+  });
 
   if (!foundUser) {
+    // Clear the cookie regardless of whether the user is found to prevent abuse
     res.clearCookie("jwt", {
       httpOnly: true,
       sameSite: "None",
       secure: true,
     });
-    return res.sendStatus(403);
+    return res.sendStatus(403); // Forbidden
   }
 
-  foundUser.refreshToken = "";
-  const result = await foundUser.save();
+  // Filter out the refresh token being logged out
+  foundUser.refreshTokens = foundUser.refreshTokens.filter(
+    (tokenObj) => tokenObj.token !== refreshToken
+  );
 
+  await foundUser.save();
+
+  // Clear the JWT cookie
   res.clearCookie("jwt", {
     httpOnly: true,
     sameSite: "None",
     secure: true,
   });
 
-  res.sendStatus(204);
+  res.sendStatus(204); // No Content
 };
 
 const handleRefreshToken = async (req, res) => {
@@ -249,7 +260,9 @@ const handleRefreshToken = async (req, res) => {
 
     const refreshToken = cookies.jwt;
     // check for user found or not
-    const foundUser = await Admin.findOne({ refreshToken });
+    const foundUser = await Admin.findOne({
+      "refreshTokens.token": refreshToken, // Searches for a specific token in the refreshTokens array
+    });
 
     if (!foundUser) return res.sendStatus(403);
 
@@ -269,7 +282,7 @@ const handleRefreshToken = async (req, res) => {
         );
 
         foundUser.password = undefined;
-        foundUser.refreshToken = undefined;
+        foundUser.refreshTokens = undefined;
         res.json({ accessToken, user: foundUser });
       }
     );

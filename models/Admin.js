@@ -25,8 +25,22 @@ const adminSchema = new Schema(
     password: {
       type: String,
     },
-    refreshToken: String,
-    OTP: String,
+    refreshTokens: [
+      {
+        token: {
+          type: String,
+        },
+        createdAt: {
+          type: Date,
+          default: Date.now,
+          expires: "30d",
+        },
+      },
+    ],
+    OTP: {
+      type: String,
+      expires: "15m",
+    },
   },
   {
     timestamps: true,

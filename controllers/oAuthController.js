@@ -55,7 +55,12 @@ const updateUserDetails = async (userModel, googleUser, refreshToken) => {
     {
       email: googleUser.email,
       photo: googleUser.picture,
-      refreshToken: refreshToken,
+      $push: {
+        refreshTokens: {
+          token: refreshToken,
+          createdAt: new Date(),
+        },
+      },
     },
     {
       new: true,
