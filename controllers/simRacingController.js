@@ -728,6 +728,7 @@ const clientStartRace = async (req, res) => {
   try {
     const { coordinates } = req.body;
     if (!coordinates || !coordinates.longitude || !coordinates.latitude) {
+      return errorResponse(res, 400, "Coordinates are required");
     }
 
     const radiusInRadians = 100 / 6371000;
@@ -915,13 +916,16 @@ const getTransactionForClient = async (req, res) => {
       _id: decoded.transactionId,
       customer: decoded.customerId,
       rig: decoded.rigId,
-      transactionStatus: "Active",
     })
       .populate("rig")
       .populate("customer");
 
     if (!transaction) {
       return errorResponse(res, 401, "Unauthorized");
+    }
+
+    if (["Completed", "Cancelled"].includes(transaction.transactionStatus)) {
+      return errorResponse(res, 401, "FN");
     }
 
     return successResponse(res, 200, "Transaction found", transaction);
