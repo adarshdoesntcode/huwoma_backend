@@ -6,6 +6,7 @@ const PaymentMode = require("../models/PaymentMode");
 const ServiceType = require("../models/ServiceType");
 const { errorResponse, successResponse } = require("./utils/reponse");
 const { generateBillNo } = require("./utils/utils");
+const mongoose = require("mongoose");
 
 // ======================CUSTOMER=============================
 
@@ -423,25 +424,15 @@ const transactionStartFromBooking = async (req, res) => {
 };
 
 const transactionOne = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
-    const {
-      service,
-      vehicleNumber,
-      customer,
-      // serviceStart,
-      actualRate,
-      serviceRate,
-      // clientDate,
-    } = req.body;
+    const { service, vehicleNumber, customer, actualRate, serviceRate } =
+      req.body;
 
     const now = new Date();
-    const serviceStartDateObj = new Date(now); // Using server-generated date for `serviceStart`
+    const serviceStartDateObj = new Date(now);
     const clientDate = now.toISOString();
-
-    // const serviceStartDateObj = new Date(serviceStart);
-    // if (isNaN(serviceStartDateObj.getTime())) {
-    //   return errorResponse(res, 400, "Invalid date format");
-    // }
 
     let billNo;
     let existingBillNo;
@@ -449,7 +440,9 @@ const transactionOne = async (req, res) => {
     if (!billNo) {
       do {
         billNo = generateBillNo(clientDate);
-        existingBillNo = await CarWashTransaction.findOne({ billNo });
+        existingBillNo = await CarWashTransaction.findOne({ billNo }).session(
+          session
+        );
       } while (existingBillNo);
     }
 
@@ -466,9 +459,11 @@ const transactionOne = async (req, res) => {
           $in: ["Paid", "Cancelled"],
         },
       },
-    });
+    }).session(session);
 
     if (existingTransaction) {
+      await session.abortTransaction();
+      session.endSession();
       return errorResponse(
         res,
         400,
@@ -476,12 +471,21 @@ const transactionOne = async (req, res) => {
       );
     }
 
-    const existingService = await ServiceType.findById(service);
+    const existingService = await ServiceType.findById(service).session(
+      session
+    );
     if (!existingService) {
+      await session.abortTransaction();
+      session.endSession();
       return errorResponse(res, 404, "Service not found.");
     }
-    const existingCustomer = await CarWashCustomer.findById(customer);
+
+    const existingCustomer = await CarWashCustomer.findById(customer).session(
+      session
+    );
     if (!existingCustomer) {
+      await session.abortTransaction();
+      session.endSession();
       return errorResponse(res, 404, "Customer not found.");
     }
 
@@ -498,12 +502,15 @@ const transactionOne = async (req, res) => {
       vehicleNumber: vehicleNumber,
     });
 
-    const savedTransaction = await newTransaction.save();
+    const savedTransaction = await newTransaction.save({ session });
     existingCustomer.customerTransactions.push(savedTransaction._id);
     existingService.serviceTransactions.push(savedTransaction._id);
 
-    await existingCustomer.save();
-    await existingService.save();
+    await existingCustomer.save({ session });
+    await existingService.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
 
     return successResponse(
       res,
@@ -512,6 +519,8 @@ const transactionOne = async (req, res) => {
       savedTransaction
     );
   } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
     console.error(err);
     return errorResponse(
       res,
@@ -523,19 +532,10 @@ const transactionOne = async (req, res) => {
 
 const transactionTwo = async (req, res) => {
   try {
-    const {
-      transactionId,
-      inspections,
-      // serviceEnd
-    } = req.body;
+    const { transactionId, inspections } = req.body;
 
     const now = new Date();
-    const serviceEndDateObj = new Date(now); // Using server-generated date for `serviceStart`
-
-    // const serviceEndDateObj = new Date(serviceEnd);
-    // if (isNaN(serviceEndDateObj.getTime())) {
-    //   return errorResponse(res, 400, "Invalid date format");
-    // }
+    const serviceEndDateObj = new Date(now);
 
     const transaction = await CarWashTransaction.findById(transactionId);
     if (!transaction) {
@@ -561,6 +561,7 @@ const transactionTwo = async (req, res) => {
 };
 
 const transactionThree = async (req, res) => {
+  let session;
   try {
     const {
       transactionId,
@@ -571,7 +572,6 @@ const transactionThree = async (req, res) => {
       parkingIn,
       parkingOut,
       parkingCost,
-      // transactionTime,
       grossAmount,
       discountAmount,
       netAmount,
@@ -619,6 +619,9 @@ const transactionThree = async (req, res) => {
       );
     }
 
+    session = await mongoose.startSession();
+    session.startTransaction();
+
     const transaction = await CarWashTransaction.findByIdAndUpdate(
       transactionId,
       {
@@ -636,25 +639,33 @@ const transactionThree = async (req, res) => {
         netAmount,
         redeemed,
       },
-      { new: true }
+      { new: true, session }
     );
 
     if (!transaction) {
+      await session.abortTransaction();
+      session.endSession();
       return errorResponse(res, 404, "Transaction not found.");
     }
 
-    const paymentModeObj = await PaymentMode.findByIdAndUpdate(paymentMode, {
-      $push: {
-        carWashTransactions: transactionId,
+    await PaymentMode.findByIdAndUpdate(
+      paymentMode,
+      {
+        $push: {
+          carWashTransactions: transactionId,
+        },
       },
-    });
+      { session }
+    );
 
     if (redeemed && washCount) {
-      const updatedTransactions = await CarWashTransaction.updateMany(
+      await CarWashTransaction.updateMany(
         {
+          customer: transaction.customer,
           paymentStatus: "Paid",
           transactionStatus: "Completed",
           "service.id": serviceId,
+          redeemed: false,
         },
         {
           $set: {
@@ -666,9 +677,13 @@ const transactionThree = async (req, res) => {
             createdAt: 1,
           },
           limit: washCount,
+          session,
         }
       );
     }
+
+    await session.commitTransaction();
+    session.endSession();
 
     return successResponse(
       res,
@@ -677,6 +692,10 @@ const transactionThree = async (req, res) => {
       transaction
     );
   } catch (err) {
+    if (session) {
+      await session.abortTransaction();
+      session.endSession();
+    }
     console.error(err);
     return errorResponse(res, 500, "Failed to update transaction.");
   }
@@ -902,6 +921,130 @@ const getPostFilterTransactions = async (req, res) => {
   }
 };
 
+const rollbackFromPickup = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const transaction = await CarWashTransaction.findOne({
+      _id: req.body.transactionId,
+      transactionStatus: "Ready for Pickup",
+    }).session(session);
+
+    if (transaction.service.end) {
+      const difference = Math.abs(
+        new Date() - new Date(transaction.service.end)
+      );
+      const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+      if (days <= 3) {
+        transaction.transactionStatus = "In Queue";
+        transaction.service.end = undefined;
+        transaction.inspections = [];
+
+        await transaction.save({ session });
+        await session.commitTransaction();
+        return successResponse(
+          res,
+          200,
+          "Transaction status changed to In Queue",
+          transaction
+        );
+      }
+    }
+
+    await session.abortTransaction();
+    return errorResponse(res, 400, "Transaction cannot be rolled back");
+  } catch (err) {
+    await session.abortTransaction();
+    return errorResponse(res, 500, "Server error. Failed to rollback");
+  } finally {
+    session.endSession();
+  }
+};
+
+const rollbackFromCompleted = async (req, res) => {
+  try {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      const transaction = await CarWashTransaction.findOne({
+        _id: req.body.transactionId,
+        transactionStatus: "Completed",
+      })
+        .populate("service.id")
+        .session(session);
+
+      if (transaction.transactionTime) {
+        const difference = Math.abs(
+          new Date() - new Date(transaction.transactionTime)
+        );
+        const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+        if (days <= 3) {
+          transaction.transactionStatus = "Ready for Pickup";
+          transaction.paymentStatus = "Pending";
+          transaction.paymentMode = undefined;
+          transaction.transactionTime = undefined;
+          transaction.parking.in = undefined;
+          transaction.parking.out = undefined;
+          transaction.parking.cost = undefined;
+          transaction.netAmount = undefined;
+          transaction.discountAmount = undefined;
+          transaction.grossAmount = undefined;
+          transaction.inspections = [];
+
+          if (
+            transaction.redeemed &&
+            transaction.service.id.streakApplicable.decision
+          ) {
+            transaction.redeemed = false;
+
+            await CarWashTransaction.updateMany(
+              {
+                customer: transaction.customer,
+                paymentStatus: "Paid",
+                transactionStatus: "Completed",
+                "service.id": transaction.service.id._id,
+                redeemed: true,
+              },
+              {
+                $set: {
+                  redeemed: false,
+                },
+              },
+              {
+                sort: {
+                  createdAt: 1,
+                },
+                limit: transaction.service.id.streakApplicable.washCount,
+                session: session,
+              }
+            );
+          }
+
+          await transaction.save({ session: session });
+
+          await session.commitTransaction();
+          return successResponse(
+            res,
+            200,
+            "Transaction status changed to In Queue",
+            transaction
+          );
+        }
+      }
+      return errorResponse(res, 400, "Transaction cannot be rolled back");
+    } catch (err) {
+      await session.abortTransaction();
+      console.log(err);
+      return errorResponse(res, 500, "Server error. Failed to rollback");
+    } finally {
+      await session.endSession();
+    }
+  } catch (err) {
+    console.log(err);
+    return errorResponse(res, 500, "Server error. Failed to rollback");
+  }
+};
+
 module.exports = {
   getAllCustomers,
   createCustomer,
@@ -919,4 +1062,6 @@ module.exports = {
   getPostFilterTransactions,
   getCustomerById,
   updateCarwashCustomer,
+  rollbackFromPickup,
+  rollbackFromCompleted,
 };

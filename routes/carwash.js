@@ -107,4 +107,18 @@ router
     carWashController.transactionStartFromBooking
   );
 
+router
+  .route("/transaction/rollback/pickup")
+  .post(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    carWashController.rollbackFromPickup
+  );
+
+router
+  .route("/transaction/rollback/completed")
+  .post(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    carWashController.rollbackFromCompleted
+  );
+
 module.exports = router;
