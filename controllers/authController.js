@@ -10,6 +10,7 @@ const {
 const { errorResponse, successResponse } = require("./utils/reponse");
 const { sendEmail } = require("./mailController");
 const roleList = require("../config/roleList");
+const SystemActivity = require("../models/SystemActivity");
 
 const handleNewAdmin = async (req, res) => {
   const { fullname, email, phoneNumber, role, confirmPassword, password } =
@@ -64,6 +65,15 @@ const handleNewAdmin = async (req, res) => {
       `,
       fromName: "Huwoma",
     });
+
+    new SystemActivity({
+      description: `New administrator (${fullname}) added.`,
+      activityType: "Create",
+      systemModule: "Authentication",
+      activityBy: req.userId,
+      activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+      userAgent: req.headers["user-agent"],
+    }).save();
 
     successResponse(res, 201, `New Admin ${fullname} has been created!`);
   } catch (err) {
@@ -196,6 +206,15 @@ const handleLogin = async (req, res) => {
       foundUser.password = undefined;
       foundUser.refreshTokens = undefined;
 
+      new SystemActivity({
+        description: `Administrator (${foundUser.fullname}) logged in.`,
+        activityType: "Login",
+        systemModule: "Authentication",
+        activityBy: foundUser._id,
+        activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+        userAgent: req.headers["user-agent"],
+      }).save();
+
       return res.status(200).json({
         accessToken,
         user: foundUser,
@@ -246,6 +265,15 @@ const handleLogout = async (req, res) => {
     sameSite: "None",
     secure: true,
   });
+
+  new SystemActivity({
+    description: `Administrator (${foundUser.fullname}) logged out.`,
+    activityType: "Logout",
+    systemModule: "Authentication",
+    activityBy: foundUser._id,
+    activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+    userAgent: req.headers["user-agent"],
+  }).save();
 
   res.sendStatus(204); // No Content
 };

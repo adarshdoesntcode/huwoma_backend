@@ -13,7 +13,7 @@ const connectDB = require("./config/dbConn");
 const verifyPOSAccessToken = require("./middleware/verifyPOSAccessToken");
 
 const PORT = process.env.PORT || 3500;
-
+app.set("trust proxy", true);
 app.use(credentials);
 app.use(cors(corsOptions));
 app.use(express.urlencoded({ extended: false }));

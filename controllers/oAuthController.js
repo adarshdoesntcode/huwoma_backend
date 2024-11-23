@@ -9,6 +9,7 @@ const {
   createRefreshToken,
   setCookie,
 } = require("./utils/token");
+const SystemActivity = require("../models/SystemActivity");
 
 const getGoogleOAuthTokens = async (req, res, code) => {
   const url = "https://oauth2.googleapis.com/token";
@@ -123,6 +124,15 @@ const googleOauthHandler = async (req, res) => {
       refreshToken
     );
     setCookie(res, refreshToken);
+
+    new SystemActivity({
+      description: `Administrator (${validUser.fullname}) logged in.`,
+      activityType: "Login",
+      systemModule: "Google OAuth",
+      activityBy: validUser._id,
+      activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+      userAgent: req.headers["user-agent"],
+    }).save();
 
     res.redirect(`${process.env.CLIENT_BASE_URL}`);
   } catch (err) {
