@@ -51,18 +51,16 @@ const handleNewAdmin = async (req, res) => {
 
     await sendEmail({
       to: email,
-      subject: "New Admin Huwoma",
-      text: `Hi ${fullname},
-      Role: ${role === 4200 ? "Admin" : "Super Admin"}
-
-      Your account has been created. Please login with the following credentials:
-
-      Email: ${email}
-      Password: ${password}
-
-      Please reset your password as soon as possible.
-      
-      Thank You.
+      subject: "New Admin",
+      html: `
+      <p>Hi ${fullname},</p>
+      <p>Your account has been created. Please login with the following credentials:</p>
+      <ul>
+        <li>Email: ${email}</li>
+        <li>Password: ${password}</li>
+      </ul>
+      <p>Please reset your password as soon as possible.</p>
+      <p>Thank You.</p>
       `,
       fromName: "Huwoma",
     });

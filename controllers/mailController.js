@@ -14,6 +14,7 @@ async function sendEmail({
   to,
   subject,
   text,
+  html,
   fromName = "YourApp",
   fromAddress = process.env.NODEMAILER_USER,
   attachments = [],
@@ -37,6 +38,7 @@ async function sendEmail({
       },
       to,
       subject,
+      html,
       text,
       attachments, // Attachments are optional.
     };

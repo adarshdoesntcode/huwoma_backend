@@ -5,6 +5,7 @@ const nodemailer = require("nodemailer");
 
 const Admin = require("../models/Admin");
 const { createAccessToken } = require("./utils/token");
+const { sendEmail } = require("./mailController");
 
 require("dotenv").config();
 
@@ -47,34 +48,22 @@ const forgotPassword = async (req, res) => {
       process.env.OTP_ACCESS_TOKEN_EXPIRATION_TIME
     );
 
-    // Send the reset token to the user's email
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      host: "smtp.ethereal.email",
-      port: 465,
-      secure: true, // Use `true` for port 465, `false` for all other ports
-      auth: {
-        user: process.env.NODEMAILER_USER,
-        pass: process.env.NODEMAILER_PASS,
-      },
-    });
-    const mailOptions = {
-      from: {
-        name: "Huwoma",
-        address: "adarshdai@gmail.com",
-      },
+    await sendEmail({
       to: foundUser.email,
       subject: "Password Reset OTP Code",
-      text: `Please use this OTP code to reset your password. OTP code:${otpCode}`,
-    };
-    transporter.sendMail(mailOptions, (error, info) => {
-      if (error) {
-        console.log(error);
-        res.status(500).send("Error sending email");
-      } else {
-        res.status(200).json({ accessToken });
-      }
+      html: `
+      <p>Hi ${foundUser.fullname},</p>
+      <p>Please use this OTP code to reset your password.</p>
+      <p>OTP code: <strong>${otpCode}</strong></p>
+      <p>This OTP code will expire in 10 minutes.</p>
+      <p>Thank you.</p>
+      <p>Best regards,</p>
+      <p>Huwoma</p>
+      `,
+      fromName: "Huwoma",
     });
+
+    return res.status(200).json({ accessToken });
   } catch (err) {
     console.error(`"error-message":${err.message}`);
     return res.sendStatus(400);

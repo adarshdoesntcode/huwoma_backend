@@ -20,7 +20,7 @@ app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 app.use(cookieParser());
 
-connectDB();
+connectDB(5);
 // Define routes
 app.use("/", require("./routes/api"));
 
