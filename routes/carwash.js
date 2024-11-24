@@ -41,13 +41,13 @@ router
 router
   .route("/transaction/prefilter")
   .get(
-    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    verifyRoles(ROLES_LIST.superAdmin),
     carWashController.getPreFilterTransactions
   );
 router
   .route("/transaction/postfilter")
   .post(
-    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    verifyRoles(ROLES_LIST.superAdmin),
     carWashController.getPostFilterTransactions
   );
 

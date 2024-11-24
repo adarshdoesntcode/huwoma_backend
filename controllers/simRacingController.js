@@ -722,6 +722,32 @@ const deleteTransaction = async (req, res) => {
   }
 };
 
+const getFilteredSimRacingTransactions = async (req, res) => {
+  try {
+    const filter = req.body;
+    const query = {};
+
+    if (filter.timeRange?.from) {
+      query.createdAt = {
+        $gte: new Date(filter.timeRange.from),
+        ...(filter.timeRange.to && { $lte: new Date(filter.timeRange.to) }),
+      };
+    }
+
+    let transactionsQuery = SimRacingTransaction.find(query)
+      .populate("rig")
+      .sort({ createdAt: 1 })
+      .populate("customer")
+      .populate("paymentMode");
+
+    const transactions = await transactionsQuery.exec();
+
+    return successResponse(res, 200, "Transactions retrieved", transactions);
+  } catch (err) {
+    return errorResponse(res, 500, "Server error. Failed to retrieve");
+  }
+};
+
 // ========================RACER UI=============================
 
 const clientStartRace = async (req, res) => {
@@ -958,4 +984,5 @@ module.exports = {
   getAllCustomers,
   getCustomerById,
   updateSimracingCustomer,
+  getFilteredSimRacingTransactions,
 };

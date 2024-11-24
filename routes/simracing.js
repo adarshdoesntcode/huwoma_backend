@@ -64,6 +64,13 @@ router
   );
 
 router
+  .route("/filteredtransactions")
+  .post(
+    verifyRoles(ROLES_LIST.superAdmin),
+    simRacingController.getFilteredSimRacingTransactions
+  );
+
+router
   .route("/transaction/booking")
   .post(
     verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
