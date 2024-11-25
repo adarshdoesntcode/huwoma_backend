@@ -57,6 +57,13 @@ router
   );
 
 router
+  .route("/transaction/rollback")
+  .post(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    simRacingController.rollbackFromCompleted
+  );
+
+router
   .route("/transactions")
   .get(
     verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),

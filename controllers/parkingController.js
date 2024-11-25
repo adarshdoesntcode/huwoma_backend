@@ -378,6 +378,31 @@ const deleteParkingTransaction = async (req, res) => {
   }
 };
 
+const getFilteredParkingTransactions = async (req, res) => {
+  try {
+    const filter = req.body;
+    const query = {};
+
+    if (filter.timeRange?.from) {
+      query.createdAt = {
+        $gte: new Date(filter.timeRange.from),
+        ...(filter.timeRange.to && { $lte: new Date(filter.timeRange.to) }),
+      };
+    }
+
+    let transactionsQuery = ParkingTransaction.find(query)
+      .populate("vehicle")
+      .populate("paymentMode")
+      .sort({ createdAt: 1 });
+
+    const transactions = await transactionsQuery.exec();
+
+    return successResponse(res, 200, "Transactions retrieved", transactions);
+  } catch (err) {
+    return errorResponse(res, 500, "Server error. Failed to retrieve");
+  }
+};
+
 module.exports = {
   getAvailableVehicles,
   parkingStart,
@@ -385,4 +410,5 @@ module.exports = {
   parkingCheckout,
   getParkingTransactions,
   deleteParkingTransaction,
+  getFilteredParkingTransactions,
 };

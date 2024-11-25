@@ -13,6 +13,13 @@ router
   );
 
 router
+  .route("/filteredtransactions")
+  .post(
+    verifyRoles(ROLES_LIST.superAdmin),
+    parkingController.getFilteredParkingTransactions
+  );
+
+router
   .route("/checkoutdetails/:transactionId")
   .get(
     verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),

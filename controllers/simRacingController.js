@@ -7,6 +7,7 @@ const { generateBillNo, generateRaceBillNo } = require("./utils/utils");
 const PaymentMode = require("../models/PaymentMode");
 const Configuration = require("../models/Configuration");
 const jwt = require("jsonwebtoken");
+const mongoose = require("mongoose");
 
 // ======================CUSTOMER=============================
 
@@ -748,6 +749,81 @@ const getFilteredSimRacingTransactions = async (req, res) => {
   }
 };
 
+const rollbackFromCompleted = async (req, res) => {
+  try {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      const transaction = await SimRacingTransaction.findOne({
+        _id: req.body.transactionId,
+        transactionStatus: "Completed",
+      })
+        .populate("rig")
+        .session(session);
+
+      if (transaction.transactionTime) {
+        const difference = Math.abs(
+          new Date() - new Date(transaction.transactionTime)
+        );
+        const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+        if (days <= 3) {
+          transaction.transactionStatus = "Active";
+          transaction.paymentStatus = "Pending";
+          transaction.paymentMode = undefined;
+          transaction.transactionTime = undefined;
+          transaction.end = undefined;
+          transaction.netAmount = undefined;
+          transaction.discountAmount = undefined;
+          transaction.grossAmount = undefined;
+
+          await transaction.save({ session: session });
+
+          const rig = await SimRacingRig.findOneAndUpdate(
+            { _id: transaction.rig, rigStatus: "Pit Stop" },
+            {
+              $unset: {
+                activeRacer: transaction.customer,
+                activeTransaction: transaction._id,
+              },
+              $set: {
+                rigStatus: "On Track",
+              },
+              $pull: { rigTransactions: transaction._id },
+            }
+          );
+
+          if (!rig) {
+            await session.abortTransaction();
+            return errorResponse(
+              res,
+              404,
+              `Rollback when ${transaction.rig.rigName} is available`
+            );
+          }
+
+          await session.commitTransaction();
+          return successResponse(
+            res,
+            200,
+            "Transaction status changed to Active",
+            transaction
+          );
+        }
+      }
+      return errorResponse(res, 400, "Transaction cannot be rolled back");
+    } catch (err) {
+      await session.abortTransaction();
+      console.log(err);
+      return errorResponse(res, 500, "Server error. Failed to rollback");
+    } finally {
+      await session.endSession();
+    }
+  } catch (err) {
+    console.log(err);
+    return errorResponse(res, 500, "Server error. Failed to rollback");
+  }
+};
+
 // ========================RACER UI=============================
 
 const clientStartRace = async (req, res) => {
@@ -985,4 +1061,5 @@ module.exports = {
   getCustomerById,
   updateSimracingCustomer,
   getFilteredSimRacingTransactions,
+  rollbackFromCompleted,
 };
