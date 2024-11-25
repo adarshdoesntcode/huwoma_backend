@@ -11,6 +11,7 @@ const { errorResponse, successResponse } = require("./utils/reponse");
 const { sendEmail } = require("./mailController");
 const roleList = require("../config/roleList");
 const SystemActivity = require("../models/SystemActivity");
+const redis = require("../config/redisConn");
 
 const handleNewAdmin = async (req, res) => {
   const { fullname, email, phoneNumber, role, confirmPassword, password } =
@@ -164,6 +165,8 @@ const handleLogin = async (req, res) => {
         message: "Unauthorized User",
       });
 
+    await redis.set(`admin:${email}`, JSON.stringify(foundUser));
+
     let match;
     try {
       match = await bcrypt.compare(password, foundUser.password);
@@ -195,11 +198,9 @@ const handleLogin = async (req, res) => {
       if (!refreshToken)
         return res.status(400).send("Refresh Token creation fail");
 
-      foundUser.refreshTokens.push({
-        token: refreshToken,
-        createdAt: new Date(),
+      await redis.set(`refresh:${refreshToken}`, JSON.stringify(foundUser), {
+        EX: 2593000, // 30 days from now
       });
-      const result = await foundUser.save();
 
       setCookie(res, refreshToken);
 
@@ -238,9 +239,10 @@ const handleLogout = async (req, res) => {
   const refreshToken = cookies.jwt;
 
   // Check if user exists with the provided refresh token
-  const foundUser = await Admin.findOne({
-    "refreshTokens.token": refreshToken,
-  });
+  const foundUser = await redis.get(`refresh:${refreshToken}`);
+  // const foundUser = await Admin.findOne({
+  //   "refreshTokens.token": refreshToken,
+  // });
 
   if (!foundUser) {
     // Clear the cookie regardless of whether the user is found to prevent abuse
@@ -253,11 +255,13 @@ const handleLogout = async (req, res) => {
   }
 
   // Filter out the refresh token being logged out
-  foundUser.refreshTokens = foundUser.refreshTokens.filter(
-    (tokenObj) => tokenObj.token !== refreshToken
-  );
+  // foundUser.refreshTokens = foundUser.refreshTokens.filter(
+  //   (tokenObj) => tokenObj.token !== refreshToken
+  // );
 
-  await foundUser.save();
+  // await foundUser.save();
+
+  await redis.del(`refresh:${refreshToken}`);
 
   // Clear the JWT cookie
   res.clearCookie("jwt", {
@@ -286,9 +290,14 @@ const handleRefreshToken = async (req, res) => {
 
     const refreshToken = cookies.jwt;
     // check for user found or not
-    const foundUser = await Admin.findOne({
-      "refreshTokens.token": refreshToken, // Searches for a specific token in the refreshTokens array
-    });
+    const foundUser = await redis.get(`refresh:${refreshToken}`);
+
+    // if (!user) {
+    //   return res.sendStatus(403); //Forbidden
+    // }
+    // const foundUser = await Admin.findOne({
+    //   "refreshTokens.token": refreshToken, // Searches for a specific token in the refreshTokens array
+    // });
 
     if (!foundUser) return res.sendStatus(403);
 

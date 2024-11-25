@@ -9,8 +9,9 @@ const mongoose = require("mongoose");
 const corsOptions = require("./config/corsOptions");
 const verifyJWT = require("./middleware/verifyJWT");
 const credentials = require("./middleware/credentials");
-const connectDB = require("./config/dbConn");
+
 const verifyPOSAccessToken = require("./middleware/verifyPOSAccessToken");
+const { connectDB, connectRedis } = require("./config/dbConn");
 
 const PORT = process.env.PORT || 3500;
 app.set("trust proxy", true);
@@ -21,6 +22,8 @@ app.use(express.json());
 app.use(cookieParser());
 
 connectDB(5);
+connectRedis();
+
 // Define routes
 app.use("/", require("./routes/api"));
 

@@ -841,10 +841,7 @@ const getPreFilterTransactions = async (req, res) => {
     }).populate({
       path: "services",
       match: {
-        $or: [
-          { serviceTypeOperational: true },
-          { serviceTransactions: { $exists: true, $not: { $size: 0 } } },
-        ],
+        serviceTypeOperational: true,
       },
     });
 
@@ -972,6 +969,12 @@ const rollbackFromCompleted = async (req, res) => {
       })
         .populate("service.id")
         .session(session);
+
+      await PaymentMode.updateOne(
+        { _id: transaction.paymentMode },
+        { $pull: { carWashTransactions: transaction._id } },
+        { session: session }
+      );
 
       if (transaction.transactionTime) {
         const difference = Math.abs(

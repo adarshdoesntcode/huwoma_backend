@@ -761,6 +761,12 @@ const rollbackFromCompleted = async (req, res) => {
         .populate("rig")
         .session(session);
 
+      await PaymentMode.updateOne(
+        { _id: transaction.paymentMode },
+        { $pull: { simRacingTransactions: transaction._id } },
+        { session: session }
+      );
+
       if (transaction.transactionTime) {
         const difference = Math.abs(
           new Date() - new Date(transaction.transactionTime)

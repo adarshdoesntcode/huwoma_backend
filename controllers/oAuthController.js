@@ -10,6 +10,7 @@ const {
   setCookie,
 } = require("./utils/token");
 const SystemActivity = require("../models/SystemActivity");
+const redis = require("../config/redisConn");
 
 const getGoogleOAuthTokens = async (req, res, code) => {
   const url = "https://oauth2.googleapis.com/token";
@@ -48,20 +49,13 @@ const getGoogleUser = async (id_token, access_token) => {
   }
 };
 
-const updateUserDetails = async (userModel, googleUser, refreshToken) => {
+const updateUserDetails = async (userModel, googleUser) => {
   const updatedUser = await userModel.findOneAndUpdate(
     {
       email: googleUser.email,
     },
     {
-      email: googleUser.email,
       photo: googleUser.picture,
-      $push: {
-        refreshTokens: {
-          token: refreshToken,
-          createdAt: new Date(),
-        },
-      },
     },
     {
       new: true,
@@ -89,9 +83,16 @@ const googleOauthHandler = async (req, res) => {
 
     let validUser, validUserModel;
 
-    validUser = await Admin.findOne({
-      email: googleUser.email,
-    });
+    const cachedUser = await redis.get(`admin:${googleUser.email}`);
+
+    if (cachedUser) {
+      validUser = cachedUser;
+    } else {
+      validUser = await Admin.findOne({
+        email: googleUser.email,
+      });
+      await redis.set(`admin:${googleUser.email}`, JSON.stringify(validUser));
+    }
 
     if (!validUser) {
       console.error("error-message:User doesn't exist");
@@ -118,15 +119,18 @@ const googleOauthHandler = async (req, res) => {
     if (!refreshToken)
       return res.status(400).send("Refresh Token creation fail");
 
-    const user = await updateUserDetails(
-      validUserModel,
-      googleUser,
-      refreshToken
-    );
+    let updatedUser = validUser;
+    if (!validUser.photo !== googleUser.picture) {
+      updatedUser = await updateUserDetails(validUserModel, googleUser);
+      await redis.set(`admin:${googleUser.email}`, JSON.stringify(updatedUser));
+    }
+
+    await redis.set(`refresh:${refreshToken}`, JSON.stringify(updatedUser));
+
     setCookie(res, refreshToken);
 
     new SystemActivity({
-      description: `Administrator (${validUser.fullname}) logged in.`,
+      description: `Administrator (${updatedUser.fullname}) logged in.`,
       activityType: "Login",
       systemModule: "Google OAuth",
       activityBy: validUser._id,

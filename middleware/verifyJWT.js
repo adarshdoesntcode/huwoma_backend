@@ -2,6 +2,7 @@ const jwt = require("jsonwebtoken");
 const roleList = require("../config/roleList");
 
 const Admin = require("../models/Admin");
+const redis = require("../config/redisConn");
 
 const verifyJWT = (req, res, next) => {
   const authHeader = req.headers.authorization || req.headers.Authorization;
@@ -23,7 +24,12 @@ const verifyJWT = (req, res, next) => {
 
     try {
       if (role.includes(roleList.admin) || role.includes(roleList.superAdmin)) {
-        freshUser = await Admin.findOne({ email });
+        const cachedUser = await redis.get(`admin:${email}`);
+        if (cachedUser) {
+          freshUser = cachedUser;
+        } else {
+          freshUser = await Admin.findOne({ email });
+        }
       } else {
         return res.sendStatus(400);
       }
