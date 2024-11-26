@@ -40,6 +40,7 @@ const verifyJWT = (req, res, next) => {
       req.email = email;
       req.role = role;
       req.userId = freshUser._id;
+
       next();
     } catch (error) {
       return res.sendStatus(500);

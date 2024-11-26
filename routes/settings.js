@@ -63,18 +63,18 @@ router
   .get(verifyRoles(ROLES_LIST.superAdmin), settingsController.getServiceType);
 //====================PACKAGE TYPE======================
 
-router
-  .route("/carwash/packagetype")
-  .post(
-    verifyRoles(ROLES_LIST.superAdmin),
-    settingsController.createPackageType
-  )
-  .get(verifyRoles(ROLES_LIST.superAdmin), settingsController.getAllPackageType)
-  .put(verifyRoles(ROLES_LIST.superAdmin), settingsController.updatePackageType)
-  .delete(
-    verifyRoles(ROLES_LIST.superAdmin),
-    settingsController.deletePackageType
-  );
+// router
+//   .route("/carwash/packagetype")
+//   .post(
+//     verifyRoles(ROLES_LIST.superAdmin),
+//     settingsController.createPackageType
+//   )
+//   .get(verifyRoles(ROLES_LIST.superAdmin), settingsController.getAllPackageType)
+//   .put(verifyRoles(ROLES_LIST.superAdmin), settingsController.updatePackageType)
+//   .delete(
+//     verifyRoles(ROLES_LIST.superAdmin),
+//     settingsController.deletePackageType
+//   );
 
 //====================INSPECTION======================
 

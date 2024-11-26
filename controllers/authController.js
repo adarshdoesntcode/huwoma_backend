@@ -126,6 +126,15 @@ const handleUpdateAdmin = async (req, res) => {
     );
     await redis.del("admin:all");
 
+    new SystemActivity({
+      description: `Administrator (${adminToUpdate.fullname}) updated.`,
+      activityType: "Update",
+      systemModule: "Admin",
+      activityBy: req.userId,
+      activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+      userAgent: req.headers["user-agent"],
+    }).save();
+
     return successResponse(res, 200, "Admin updated successfully");
   } catch (err) {
     return errorResponse(res, 500, err.message);
@@ -154,6 +163,15 @@ const handleDeleteAdmin = async (req, res) => {
 
     await redis.del(`admin:${adminToDelete.email}`);
     await redis.del("admin:all");
+
+    new SystemActivity({
+      description: `Admin (${adminToDelete.fullname}) deleted.`,
+      activityType: "Delete",
+      systemModule: "Admin",
+      activityBy: req.userId,
+      activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+      userAgent: req.headers["user-agent"],
+    }).save();
 
     return successResponse(
       res,
@@ -380,9 +398,20 @@ const updateAdminProfile = async (req, res) => {
     }
 
     if (fullname) {
+      const oldname = admin.fullname;
       admin.fullname = fullname;
       await admin.save();
       const { password, refreshToken, ...adminData } = admin.toObject();
+
+      new SystemActivity({
+        description: `${oldname} changed their name to ${fullname}.`,
+        activityType: "Update",
+        systemModule: "Admin",
+        activityBy: req.userId,
+        activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+        userAgent: req.headers["user-agent"],
+      }).save();
+
       return successResponse(
         res,
         200,
@@ -395,6 +424,16 @@ const updateAdminProfile = async (req, res) => {
       admin.email = email;
       await admin.save();
       const { password, refreshToken, ...adminData } = admin.toObject();
+
+      new SystemActivity({
+        description: `${admin.fullname} changed their email to ${email}.`,
+        activityType: "Update",
+        systemModule: "Admin",
+        activityBy: req.userId,
+        activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+        userAgent: req.headers["user-agent"],
+      }).save();
+
       return successResponse(res, 200, "Email updated successfully", adminData);
     }
 
@@ -402,6 +441,16 @@ const updateAdminProfile = async (req, res) => {
       admin.phoneNumber = phoneNumber;
       await admin.save();
       const { password, refreshToken, ...adminData } = admin.toObject();
+
+      new SystemActivity({
+        description: `${admin.fullname} changed their contact to ${phoneNumber}.`,
+        activityType: "Update",
+        systemModule: "Admin",
+        activityBy: req.userId,
+        activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+        userAgent: req.headers["user-agent"],
+      }).save();
+
       return successResponse(
         res,
         200,
@@ -431,6 +480,15 @@ const updateAdminProfile = async (req, res) => {
       const hashedPassword = await bcrypt.hash(newPassword, 10);
       admin.password = hashedPassword;
       await admin.save();
+
+      new SystemActivity({
+        description: `${admin.fullname} changed their password.`,
+        activityType: "Update",
+        systemModule: "Admin",
+        activityBy: req.userId,
+        activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+        userAgent: req.headers["user-agent"],
+      }).save();
 
       return successResponse(res, 200, "Password updated successfully");
     }

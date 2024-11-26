@@ -11,6 +11,7 @@ const POSAccess = require("../models/POSAccess");
 const SimRacingRig = require("../models/SimRacingRig");
 const ParkingVehicleType = require("../models/ParkingVehicleType");
 const redis = require("../config/redisConn");
+const SystemActivity = require("../models/SystemActivity");
 
 //====================VEHICLE TYPE======================
 
@@ -30,6 +31,15 @@ const createVehicleType = async (req, res) => {
 
     const savedVehicleType = await newVehicleType.save();
     await redis.del("carwash:vehicles");
+
+    new SystemActivity({
+      description: `${vehicleTypeName} created.`,
+      activityType: "Create",
+      systemModule: "Carwash Vehicle",
+      activityBy: req.userId,
+      activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+      userAgent: req.headers["user-agent"],
+    }).save();
 
     return successResponse(
       res,
@@ -115,6 +125,15 @@ const updateVehicleType = async (req, res) => {
 
     await redis.del("carwash:vehicles");
 
+    new SystemActivity({
+      description: `${updatedVehicleType.vehicleTypeName} updated.`,
+      activityType: "Update",
+      systemModule: "Carwash Vehicle",
+      activityBy: req.userId,
+      activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+      userAgent: req.headers["user-agent"],
+    }).save();
+
     return successResponse(
       res,
       200,
@@ -148,6 +167,15 @@ const deleteVehicleType = async (req, res) => {
 
     await redis.del("carwash:vehicles");
 
+    new SystemActivity({
+      description: `${vehicleType.vehicleTypeName} and its services deleted.`,
+      activityType: "Delete",
+      systemModule: "Carwash Vehicle",
+      activityBy: req.userId,
+      activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+      userAgent: req.headers["user-agent"],
+    }).save();
+
     return successResponse(res, 200, "Config deactivated", vehicleType);
   } catch (error) {
     return errorResponse(res, 500, "Server error", error.message);
@@ -164,6 +192,9 @@ const createServiceType = async (req, res) => {
     if (!vehicleType) {
       return errorResponse(res, 404, "Vehicle type not found");
     }
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
     const savedServices = [];
 
@@ -187,15 +218,27 @@ const createServiceType = async (req, res) => {
         serviceVehicle: vehicleTypeId,
       });
 
-      const savedService = await newService.save();
+      const savedService = await newService.save({ session });
       savedServices.push(savedService);
 
       vehicleType.services.push(savedService._id);
     }
 
-    await vehicleType.save();
+    await vehicleType.save({ session });
+
+    await session.commitTransaction();
+    await session.endSession();
 
     await redis.del("carwash:vehicles");
+
+    new SystemActivity({
+      description: `${vehicleType.vehicleTypeName}'s services created.`,
+      activityType: "Create",
+      systemModule: "Vehicle Service",
+      activityBy: req.userId,
+      activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+      userAgent: req.headers["user-agent"],
+    }).save();
 
     return successResponse(
       res,
@@ -205,6 +248,10 @@ const createServiceType = async (req, res) => {
     );
   } catch (error) {
     console.error(error);
+
+    await session.abortTransaction();
+    await session.endSession();
+
     return errorResponse(res, 500, "Server error", error.message);
   }
 };
@@ -227,7 +274,7 @@ const getServiceType = async (req, res) => {
       serviceTypeOperational: true,
       serviceVehicle: vehicleTypeId,
     }).select(
-      "-__v -createdAt -updatedAt -serviceVehicle -serviceTypeOperational -serviceTransactions"
+      "-__v -createdAt -updatedAt -serviceVehicle -serviceTypeOperational"
     );
 
     if (activeServiceTypes.length === 0) {
@@ -313,6 +360,15 @@ const updateServiceType = async (req, res) => {
 
     await redis.del("carwash:vehicles");
 
+    new SystemActivity({
+      description: `${vehicleType.vehicleTypeName}'s services updated.`,
+      activityType: "Update",
+      systemModule: "Vehicle Service",
+      activityBy: req.userId,
+      activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+      userAgent: req.headers["user-agent"],
+    }).save();
+
     return successResponse(
       res,
       200,
@@ -342,13 +398,21 @@ const deleteServiceType = async (req, res) => {
     if (!serviceType) {
       return res.status(404).json({ error: "Service Type not found" });
     }
+    await redis.del("carwash:vehicles");
+
+    new SystemActivity({
+      description: `${serviceType.serviceTypeName}' deleted.`,
+      activityType: "Delete",
+      systemModule: "Vehicle Service",
+      activityBy: req.userId,
+      activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+      userAgent: req.headers["user-agent"],
+    }).save();
 
     res.status(200).json({
       message: "Service Type soft deleted successfully",
       serviceType,
     });
-
-    await redis.del("carwash:vehicles");
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
@@ -357,111 +421,111 @@ const deleteServiceType = async (req, res) => {
 
 //====================PACKAGE TYPE======================
 
-const createPackageType = async (req, res) => {
-  try {
-    const {
-      packageTypeName,
-      packageContents,
-      billAbbreviation,
-      packageRate,
-      includeParking,
-      streakApplicable,
-      vehicleTypeId,
-    } = req.body;
+// const createPackageType = async (req, res) => {
+//   try {
+//     const {
+//       packageTypeName,
+//       packageContents,
+//       billAbbreviation,
+//       packageRate,
+//       includeParking,
+//       streakApplicable,
+//       vehicleTypeId,
+//     } = req.body;
 
-    const vehicleType = await CarWashVehicleType.findById(vehicleTypeId);
-    if (!vehicleType) {
-      return res.status(404).json({ error: "Vehicle not found" });
-    }
+//     const vehicleType = await CarWashVehicleType.findById(vehicleTypeId);
+//     if (!vehicleType) {
+//       return res.status(404).json({ error: "Vehicle not found" });
+//     }
 
-    const newPackageType = new PackageType({
-      packageTypeName,
-      packageContents,
-      billAbbreviation,
-      packageRate,
-      includeParking,
-      streakApplicable,
-      packageVehicle: vehicleTypeId,
-    });
+//     const newPackageType = new PackageType({
+//       packageTypeName,
+//       packageContents,
+//       billAbbreviation,
+//       packageRate,
+//       includeParking,
+//       streakApplicable,
+//       packageVehicle: vehicleTypeId,
+//     });
 
-    const savedService = await newPackageType.save();
+//     const savedService = await newPackageType.save();
 
-    vehicleType.packages.push(newPackageType._id);
-    await vehicleType.save();
+//     vehicleType.packages.push(newPackageType._id);
+//     await vehicleType.save();
 
-    res.status(201).json({
-      message: "Package type created successfully",
-      data: savedService,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
-  }
-};
+//     res.status(201).json({
+//       message: "Package type created successfully",
+//       data: savedService,
+//     });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ error: "Server error" });
+//   }
+// };
 
-const getAllPackageType = async (req, res) => {
-  try {
-    const activePackageTypes = await PackageType.find({
-      packageTypeOperational: true,
-    });
-    if (activePackageTypes.length === 0) {
-      return res.status(204).send();
-    }
+// const getAllPackageType = async (req, res) => {
+//   try {
+//     const activePackageTypes = await PackageType.find({
+//       packageTypeOperational: true,
+//     });
+//     if (activePackageTypes.length === 0) {
+//       return res.status(204).send();
+//     }
 
-    res.status(200).json(activePackageTypes);
-  } catch (err) {
-    console.error(err);
+//     res.status(200).json(activePackageTypes);
+//   } catch (err) {
+//     console.error(err);
 
-    res.status(500).json({ error: "Server error" });
-  }
-};
+//     res.status(500).json({ error: "Server error" });
+//   }
+// };
 
-const updatePackageType = async (req, res) => {
-  const { packageTypeId, updates } = req.body;
+// const updatePackageType = async (req, res) => {
+//   const { packageTypeId, updates } = req.body;
 
-  try {
-    const updatedPackageType = await PackageType.findOneAndUpdate(
-      { _id: packageTypeId, packageTypeOperational: true },
-      updates,
-      { new: true, runValidators: true }
-    );
+//   try {
+//     const updatedPackageType = await PackageType.findOneAndUpdate(
+//       { _id: packageTypeId, packageTypeOperational: true },
+//       updates,
+//       { new: true, runValidators: true }
+//     );
 
-    if (!updatedPackageType) {
-      return res.status(404).json({ error: "Package Type not found" });
-    }
+//     if (!updatedPackageType) {
+//       return res.status(404).json({ error: "Package Type not found" });
+//     }
 
-    res.status(200).json(updatedPackageType);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
-  }
-};
+//     res.status(200).json(updatedPackageType);
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ error: "Server error" });
+//   }
+// };
 
-const deletePackageType = async (req, res) => {
-  const { packageTypeId } = req.body;
+// const deletePackageType = async (req, res) => {
+//   const { packageTypeId } = req.body;
 
-  try {
-    const packageType = await PackageType.findOneAndUpdate(
-      { _id: packageTypeId, packageTypeOperational: true },
-      {
-        packageTypeOperational: false,
-      },
-      { new: true, runValidators: true }
-    );
+//   try {
+//     const packageType = await PackageType.findOneAndUpdate(
+//       { _id: packageTypeId, packageTypeOperational: true },
+//       {
+//         packageTypeOperational: false,
+//       },
+//       { new: true, runValidators: true }
+//     );
 
-    if (!packageType) {
-      return res.status(404).json({ error: "Package Type not found" });
-    }
+//     if (!packageType) {
+//       return res.status(404).json({ error: "Package Type not found" });
+//     }
 
-    res.status(200).json({
-      message: "Service Type soft deleted successfully",
-      data: packageType,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
-  }
-};
+//     res.status(200).json({
+//       message: "Service Type soft deleted successfully",
+//       data: packageType,
+//     });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ error: "Server error" });
+//   }
+// };
 
 //====================INSPECTION======================
 
@@ -565,33 +629,33 @@ const getInspectionTemplate = async (req, res) => {
   }
 };
 
-const updateInspectionTemplate = async (req, res) => {
-  try {
-    const { templateId, categories } = req.body;
+// const updateInspectionTemplate = async (req, res) => {
+//   try {
+//     const { templateId, categories } = req.body;
 
-    const updatedTemplate = await InspectionTemplate.findByIdAndUpdate(
-      templateId,
-      { categories },
-      { new: true }
-    );
+//     const updatedTemplate = await InspectionTemplate.findByIdAndUpdate(
+//       templateId,
+//       { categories },
+//       { new: true }
+//     );
 
-    if (!updatedTemplate) {
-      return errorResponse(res, 404, "Inspection template not found");
-    }
+//     if (!updatedTemplate) {
+//       return errorResponse(res, 404, "Inspection template not found");
+//     }
 
-    await redis.set("carwash:inspection", JSON.stringify(updatedTemplate));
+//     await redis.set("carwash:inspection", JSON.stringify(updatedTemplate));
 
-    return successResponse(
-      res,
-      200,
-      "Inspection template updated successfully",
-      updatedTemplate
-    );
-  } catch (error) {
-    console.error(error);
-    return errorResponse(res, 500, "Server error", error.message);
-  }
-};
+//     return successResponse(
+//       res,
+//       200,
+//       "Inspection template updated successfully",
+//       updatedTemplate
+//     );
+//   } catch (error) {
+//     console.error(error);
+//     return errorResponse(res, 500, "Server error", error.message);
+//   }
+// };
 
 //====================SIM RACING======================
 
@@ -887,6 +951,8 @@ const createPaymentMode = async (req, res) => {
 
     const savedPaymentMode = await newPaymentMode.save();
 
+    await redis.del("payment:all");
+
     return successResponse(
       res,
       201,
@@ -900,9 +966,20 @@ const createPaymentMode = async (req, res) => {
 
 const getAllPaymentMode = async (req, res) => {
   try {
-    const activePaymentModes = await PaymentMode.find({
-      paymentModeOperational: true,
-    });
+    let activePaymentModes;
+
+    const cachedPayment = await redis.get("payment:all");
+
+    if (!cachedPayment) {
+      activePaymentModes = await PaymentMode.find({
+        paymentModeOperational: true,
+      });
+      if (activePaymentModes.length > 0) {
+        await redis.set("payment:all", JSON.stringify(activePaymentModes));
+      }
+    } else {
+      activePaymentModes = JSON.parse(cachedPayment);
+    }
 
     if (activePaymentModes.length === 0) {
       return successResponse(res, 204, "No active payment modes found");
@@ -933,6 +1010,8 @@ const updatePaymentMode = async (req, res) => {
       return errorResponse(res, 404, "Payment mode not found");
     }
 
+    await redis.del("payment:all");
+
     return successResponse(
       res,
       200,
@@ -958,6 +1037,8 @@ const deletePaymentMode = async (req, res) => {
     if (!paymentMode) {
       return errorResponse(res, 404, "Payment mode not found");
     }
+
+    await redis.del("payment:all");
 
     return successResponse(
       res,
@@ -1050,13 +1131,13 @@ module.exports = {
   getServiceType,
   updateServiceType,
   deleteServiceType,
-  createPackageType,
-  getAllPackageType,
-  updatePackageType,
-  deletePackageType,
+  // createPackageType,
+  // getAllPackageType,
+  // updatePackageType,
+  // deletePackageType,
   createInspectionTemplate,
   getInspectionTemplate,
-  updateInspectionTemplate,
+  // updateInspectionTemplate,
   createPaymentMode,
   getAllPaymentMode,
   updatePaymentMode,

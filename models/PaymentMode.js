@@ -7,24 +7,24 @@ const PaymentModeSchema = new Schema(
       type: String,
       required: true,
     },
-    carWashTransactions: [
-      {
-        type: Schema.Types.ObjectId,
-        ref: "CarWashTransaction",
-      },
-    ],
-    simRacingTransactions: [
-      {
-        type: Schema.Types.ObjectId,
-        ref: "SimRacingTransaction",
-      },
-    ],
-    parkingTransactions: [
-      {
-        type: Schema.Types.ObjectId,
-        ref: "ParkingTransaction",
-      },
-    ],
+    // carWashTransactions: [
+    //   {
+    //     type: Schema.Types.ObjectId,
+    //     ref: "CarWashTransaction",
+    //   },
+    // ],
+    // simRacingTransactions: [
+    //   {
+    //     type: Schema.Types.ObjectId,
+    //     ref: "SimRacingTransaction",
+    //   },
+    // ],
+    // parkingTransactions: [
+    //   {
+    //     type: Schema.Types.ObjectId,
+    //     ref: "ParkingTransaction",
+    //   },
+    // ],
     qrCodeData: {
       type: String,
     },

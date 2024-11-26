@@ -1,9 +1,11 @@
+const redis = require("../config/redisConn");
 const CarWashCustomer = require("../models/CarWashCustomer");
 const CarWashTransaction = require("../models/CarWashTransaction");
 const CarWashVehicleType = require("../models/CarWashVehicleType");
 const InspectionTemplate = require("../models/InspectionTemplate");
 const PaymentMode = require("../models/PaymentMode");
 const ServiceType = require("../models/ServiceType");
+const SystemActivity = require("../models/SystemActivity");
 const { errorResponse, successResponse } = require("./utils/reponse");
 const { generateBillNo } = require("./utils/utils");
 const mongoose = require("mongoose");
@@ -178,6 +180,15 @@ const updateCarwashCustomer = async (req, res) => {
       return errorResponse(res, 404, "Customer not found");
     }
 
+    new SystemActivity({
+      description: `${customer.customerName}'s details updated.`,
+      activityType: "Update",
+      systemModule: "Carwash Customer",
+      activityBy: req.userId,
+      activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+      userAgent: req.headers["user-agent"],
+    }).save();
+
     return successResponse(res, 200, "Customer updated successfully", customer);
   } catch (error) {
     return errorResponse(res, 500, "Server error", error.message);
@@ -197,69 +208,78 @@ const getCarwashTransactions = async (req, res) => {
     const endOfDay = new Date(nowDateObj);
     endOfDay.setUTCHours(23, 59, 59, 999);
 
-    const transactions = await CarWashTransaction.find({
-      $or: [
-        {
-          $or: [
-            {
-              createdAt: {
-                $gte: startOfDay,
-                $lt: endOfDay,
-              },
-            },
-            {
-              transactionTime: {
-                $gte: startOfDay,
-                $lt: endOfDay,
-              },
-            },
-            // {
-            //   "service.end": {
-            //     $gte: startOfDay,
-            //     $lt: endOfDay,
-            //   },
-            // },
-          ],
-        },
-        {
-          $or: [
-            {
-              transactionStatus: {
-                $in: ["Booked", "In Queue", "Ready for Pickup"],
-              },
-            },
-            { paymentStatus: "Pending" },
-          ],
-        },
-      ],
-    })
-      .sort({ createdAt: -1 })
-      .populate({
-        path: "service.id",
-        populate: {
-          path: "serviceVehicle",
-        },
-      })
-      .populate("customer")
-      .populate({
-        path: "customer",
-        populate: {
-          path: "customerTransactions",
-          match: {
-            transactionStatus: "Completed",
-            paymentStatus: "Paid",
-            redeemed: false,
-          },
-        },
-      })
-      .populate("paymentMode");
+    const hours = await redis.hgetall("carwash_hourly_count");
 
-    return successResponse(
-      res,
-      200,
-      "Transactions retrieved successfully.",
-      transactions
-    );
+    let transactions = [];
+
+    const cachedTransactions = await redis.get("carwash:transactions_today");
+
+    if (cachedTransactions) {
+      transactions = JSON.parse(cachedTransactions);
+    } else {
+      transactions = await CarWashTransaction.find({
+        $or: [
+          {
+            $or: [
+              {
+                createdAt: {
+                  $gte: startOfDay,
+                  $lt: endOfDay,
+                },
+              },
+              {
+                transactionTime: {
+                  $gte: startOfDay,
+                  $lt: endOfDay,
+                },
+              },
+            ],
+          },
+          {
+            $or: [
+              {
+                transactionStatus: {
+                  $in: ["Booked", "In Queue", "Ready for Pickup"],
+                },
+              },
+              { paymentStatus: "Pending" },
+            ],
+          },
+        ],
+      })
+        .sort({ createdAt: -1 })
+        .populate({
+          path: "service.id",
+          populate: {
+            path: "serviceVehicle",
+          },
+        })
+        .populate("customer")
+        .populate({
+          path: "customer",
+          populate: {
+            path: "customerTransactions",
+            match: {
+              transactionStatus: "Completed",
+              paymentStatus: "Paid",
+              redeemed: false,
+            },
+          },
+        })
+        .populate("paymentMode");
+
+      await redis.set(
+        "carwash:transactions_today",
+        JSON.stringify(transactions),
+        "EX",
+        3600
+      );
+    }
+
+    return successResponse(res, 200, "Transactions retrieved successfully.", {
+      hours,
+      transactions,
+    });
   } catch (err) {
     console.log(err);
     return errorResponse(res, 500, "Failed to retrieve transactions.");
@@ -268,11 +288,7 @@ const getCarwashTransactions = async (req, res) => {
 
 const createNewBookingTransaction = async (req, res) => {
   try {
-    const {
-      customerId,
-      bookingDeadline,
-      //  clientDate
-    } = req.body;
+    const { customerId, bookingDeadline } = req.body;
 
     const now = new Date();
     const clientDate = now.toISOString();
@@ -289,45 +305,74 @@ const createNewBookingTransaction = async (req, res) => {
     let billNo;
     let existingBillNo;
 
-    do {
-      billNo = generateBillNo(clientDate);
-      existingBillNo = await CarWashTransaction.findOne({ billNo });
-    } while (existingBillNo);
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    const existingTransaction = await CarWashTransaction.findOne({
-      bookingDeadline: bookingDeadlineDateObj,
-      transactionStatus: "Booked",
-    });
+    try {
+      do {
+        billNo = generateBillNo(clientDate);
+        existingBillNo = await CarWashTransaction.findOne({ billNo }).session(
+          session
+        );
+      } while (existingBillNo);
 
-    if (existingTransaction) {
-      return errorResponse(
+      const existingTransaction = await CarWashTransaction.findOne({
+        bookingDeadline: bookingDeadlineDateObj,
+        transactionStatus: "Booked",
+      }).session(session);
+
+      if (existingTransaction) {
+        await session.abortTransaction();
+        session.endSession();
+        return errorResponse(
+          res,
+          400,
+          "There is already an active booking at this time"
+        );
+      }
+
+      const newTransaction = new CarWashTransaction({
+        customer: customerId,
+        billNo,
+        transactionStatus: "Booked",
+        bookingDeadline,
+      });
+
+      await newTransaction.save({ session });
+
+      await redis.del("carwash:transactions_today");
+
+      new SystemActivity({
+        description: `Carwash Booking created for ${newTransaction.billNo}. `,
+        activityType: "Booking",
+        systemModule: "Vehicle Service",
+        activityBy: req.userId,
+        activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+        userAgent: req.headers["user-agent"],
+      }).save();
+
+      await session.commitTransaction();
+      session.endSession();
+
+      return successResponse(
         res,
-        400,
-        "There is already an active booking at this time"
+        201,
+        "Booking transaction created successfully",
+        newTransaction
       );
+    } catch (error) {
+      await session.abortTransaction();
+      session.endSession();
+      return errorResponse(res, 500, "Server error", error.message);
     }
-
-    const newTransaction = new CarWashTransaction({
-      customer: customerId,
-      billNo,
-      transactionStatus: "Booked",
-      bookingDeadline,
-    });
-
-    await newTransaction.save();
-
-    return successResponse(
-      res,
-      201,
-      "Booking transaction created successfully",
-      newTransaction
-    );
   } catch (error) {
     return errorResponse(res, 500, "Server error", error.message);
   }
 };
 
 const transactionStartFromBooking = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
     const {
       transactionId,
@@ -348,7 +393,9 @@ const transactionStartFromBooking = async (req, res) => {
       return errorResponse(res, 400, "Invalid date format");
     }
 
-    const existingCustomer = await CarWashCustomer.findById(customer);
+    const existingCustomer = await CarWashCustomer.findById(customer).session(
+      session
+    );
     if (!existingCustomer) {
       return errorResponse(res, 404, "Customer not found.");
     }
@@ -366,9 +413,11 @@ const transactionStartFromBooking = async (req, res) => {
           $in: ["Paid", "Cancelled"],
         },
       },
-    });
+    }).session(session);
 
-    const existingService = await ServiceType.findById(service);
+    const existingService = await ServiceType.findById(service).session(
+      session
+    );
     if (!existingService) {
       return errorResponse(res, 404, "Service not found.");
     }
@@ -396,17 +445,32 @@ const transactionStartFromBooking = async (req, res) => {
         },
         $unset: { deleteAt: "" },
         vehicleNumber: vehicleNumber,
+      },
+      {
+        new: true,
+        runValidators: true,
       }
-    );
+    ).session(session);
     if (!transaction) {
       return errorResponse(res, 404, "Transaction not found.");
     }
 
     existingCustomer.customerTransactions.push(transaction._id);
-    existingService.serviceTransactions.push(transaction._id);
+    // existingService.serviceTransactions.push(transaction._id);
 
-    await existingCustomer.save();
-    await existingService.save();
+    await existingCustomer.save({ session });
+    // await existingService.save({ session });
+
+    await redis.del("carwash:transactions_today");
+    await redis.hincrby(
+      "carwash_hourly_count",
+      serviceStartDateObj.getHours(),
+      1
+    );
+
+    await session.commitTransaction();
+    session.endSession();
+
     return successResponse(
       res,
       200,
@@ -414,6 +478,8 @@ const transactionStartFromBooking = async (req, res) => {
       transaction
     );
   } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
     console.error(err);
     return errorResponse(
       res,
@@ -504,10 +570,18 @@ const transactionOne = async (req, res) => {
 
     const savedTransaction = await newTransaction.save({ session });
     existingCustomer.customerTransactions.push(savedTransaction._id);
-    existingService.serviceTransactions.push(savedTransaction._id);
+    // existingService.serviceTransactions.push(savedTransaction._id);
 
     await existingCustomer.save({ session });
-    await existingService.save({ session });
+    // await existingService.save({ session });
+
+    await redis.del("carwash:transactions_today");
+
+    await redis.hincrby(
+      "carwash_hourly_count",
+      serviceStartDateObj.getHours(),
+      1
+    );
 
     await session.commitTransaction();
     session.endSession();
@@ -531,14 +605,22 @@ const transactionOne = async (req, res) => {
 };
 
 const transactionTwo = async (req, res) => {
+  let session;
   try {
     const { transactionId, inspections } = req.body;
 
     const now = new Date();
     const serviceEndDateObj = new Date(now);
 
-    const transaction = await CarWashTransaction.findById(transactionId);
+    session = await mongoose.startSession();
+    session.startTransaction();
+
+    const transaction = await CarWashTransaction.findById(
+      transactionId
+    ).session(session);
     if (!transaction) {
+      await session.abortTransaction();
+      session.endSession();
       return errorResponse(res, 404, "Transaction not found.");
     }
 
@@ -546,7 +628,12 @@ const transactionTwo = async (req, res) => {
     transaction.service.end = serviceEndDateObj;
     transaction.inspections = inspections;
 
-    await transaction.save();
+    await transaction.save({ session });
+
+    await redis.del("carwash:transactions_today");
+
+    await session.commitTransaction();
+    session.endSession();
 
     return successResponse(
       res,
@@ -555,6 +642,8 @@ const transactionTwo = async (req, res) => {
       transaction
     );
   } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
     console.error(err);
     return errorResponse(res, 500, "Failed to update transaction.");
   }
@@ -648,15 +737,15 @@ const transactionThree = async (req, res) => {
       return errorResponse(res, 404, "Transaction not found.");
     }
 
-    await PaymentMode.findByIdAndUpdate(
-      paymentMode,
-      {
-        $push: {
-          carWashTransactions: transactionId,
-        },
-      },
-      { session }
-    );
+    // await PaymentMode.findByIdAndUpdate(
+    //   paymentMode,
+    //   {
+    //     $push: {
+    //       carWashTransactions: transactionId,
+    //     },
+    //   },
+    //   { session }
+    // );
 
     if (redeemed && washCount) {
       await CarWashTransaction.updateMany(
@@ -681,6 +770,8 @@ const transactionThree = async (req, res) => {
         }
       );
     }
+
+    await redis.del("carwash:transactions_today");
 
     await session.commitTransaction();
     session.endSession();
@@ -734,9 +825,16 @@ const getCheckoutDetails = async (req, res) => {
       (transaction) => transaction.service.id
     );
 
-    const paymentModes = await PaymentMode.find({
-      paymentModeOperational: true,
-    });
+    let paymentModes;
+    const cachedPaymentModes = await redis.get("carwash:payment_modes");
+
+    if (cachedPaymentModes) {
+      paymentModes = JSON.parse(cachedPaymentModes);
+    } else {
+      paymentModes = await PaymentMode.find({
+        paymentModeOperational: true,
+      });
+    }
 
     return successResponse(
       res,
@@ -771,9 +869,20 @@ const getTransactionForInspection = async (req, res) => {
       return errorResponse(res, 404, "Transaction not found.");
     }
 
-    const inspectionTemplates = await InspectionTemplate.find().select(
-      "-__v -createdAt -updatedAt"
-    );
+    let inspectionTemplates = await redis.get("carwash:inspection");
+
+    if (!inspectionTemplates) {
+      inspectionTemplates = await InspectionTemplate.find().select(
+        "-__v -createdAt -updatedAt"
+      );
+
+      await redis.set(
+        "carwash:inspection",
+        JSON.stringify(inspectionTemplates)
+      );
+    } else {
+      inspectionTemplates = JSON.parse(inspectionTemplates);
+    }
 
     return successResponse(
       res,
@@ -815,6 +924,17 @@ const deleteTransaction = async (req, res) => {
     if (!transaction) {
       return errorResponse(res, 404, "Transaction not found.");
     }
+
+    new SystemActivity({
+      description: `${transaction.billNo} terminated`,
+      activityType: "Cancelled",
+      systemModule: "Carwash Transaction",
+      activityBy: req.userId,
+      activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+      userAgent: req.headers["user-agent"],
+    }).save();
+
+    await redis.del("carwash:transactions_today");
 
     return successResponse(
       res,
@@ -938,6 +1058,16 @@ const rollbackFromPickup = async (req, res) => {
         transaction.inspections = [];
 
         await transaction.save({ session });
+        await redis.del("carwash:transactions_today");
+
+        new SystemActivity({
+          description: `${transaction.billNo} rolled back to "In Queue"`,
+          activityType: "Rollback",
+          systemModule: "Carwash Transaction",
+          activityBy: req.userId,
+          activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+          userAgent: req.headers["user-agent"],
+        }).save();
         await session.commitTransaction();
         return successResponse(
           res,
@@ -970,11 +1100,11 @@ const rollbackFromCompleted = async (req, res) => {
         .populate("service.id")
         .session(session);
 
-      await PaymentMode.updateOne(
-        { _id: transaction.paymentMode },
-        { $pull: { carWashTransactions: transaction._id } },
-        { session: session }
-      );
+      // await PaymentMode.updateOne(
+      //   { _id: transaction.paymentMode },
+      //   { $pull: { carWashTransactions: transaction._id } },
+      //   { session: session }
+      // );
 
       if (transaction.transactionTime) {
         const difference = Math.abs(
@@ -1024,6 +1154,17 @@ const rollbackFromCompleted = async (req, res) => {
           }
 
           await transaction.save({ session: session });
+
+          await redis.del("carwash:transactions_today");
+
+          new SystemActivity({
+            description: `${transaction.billNo} rolled back to "Ready for Pickup"`,
+            activityType: "Rollback",
+            systemModule: "Carwash Transaction",
+            activityBy: req.userId,
+            activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+            userAgent: req.headers["user-agent"],
+          }).save();
 
           await session.commitTransaction();
           return successResponse(
