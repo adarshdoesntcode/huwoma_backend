@@ -83,15 +83,19 @@ const googleOauthHandler = async (req, res) => {
 
     let validUser, validUserModel;
 
-    const cachedUser = await redis.get(`admin:${googleUser.email}`);
+    const cachedUser = await redis.get(
+      `admin:${googleUser.email.toLowerCase()}`
+    );
 
     if (cachedUser) {
-      validUser = cachedUser;
+      validUser = JSON.parse(cachedUser);
     } else {
       validUser = await Admin.findOne({
         email: googleUser.email,
       });
-      await redis.set(`admin:${googleUser.email}`, JSON.stringify(validUser));
+      if (validUser) {
+        await redis.set(`admin:${googleUser.email}`, JSON.stringify(validUser));
+      }
     }
 
     if (!validUser) {
@@ -122,10 +126,20 @@ const googleOauthHandler = async (req, res) => {
     let updatedUser = validUser;
     if (!validUser.photo !== googleUser.picture) {
       updatedUser = await updateUserDetails(validUserModel, googleUser);
-      await redis.set(`admin:${googleUser.email}`, JSON.stringify(updatedUser));
+      if (updatedUser) {
+        await redis.set(
+          `admin:${googleUser.email}`,
+          JSON.stringify(updatedUser)
+        );
+      }
     }
 
-    await redis.set(`refresh:${refreshToken}`, JSON.stringify(updatedUser));
+    await redis.set(
+      `refresh:${refreshToken}`,
+      JSON.stringify(updatedUser),
+      "EX",
+      30 * 24 * 60 * 60
+    );
 
     setCookie(res, refreshToken);
 

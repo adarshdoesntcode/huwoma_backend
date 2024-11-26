@@ -1,9 +1,9 @@
-// redisClient.js
-const { Redis } = require("@upstash/redis");
+const Redis = require("ioredis");
 
-const redis = new Redis({
-  url: process.env.KV_REST_API_URL,
-  token: process.env.KV_REST_API_TOKEN,
+const redis = new Redis(process.env.REDIS_ACCESS_URL);
+
+redis.on("command", (cmd) => {
+  console.log("Redis Command:", cmd.name, cmd.args);
 });
 
 module.exports = redis;

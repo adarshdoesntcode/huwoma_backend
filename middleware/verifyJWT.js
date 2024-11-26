@@ -25,8 +25,9 @@ const verifyJWT = (req, res, next) => {
     try {
       if (role.includes(roleList.admin) || role.includes(roleList.superAdmin)) {
         const cachedUser = await redis.get(`admin:${email}`);
+
         if (cachedUser) {
-          freshUser = cachedUser;
+          freshUser = JSON.parse(cachedUser);
         } else {
           freshUser = await Admin.findOne({ email });
         }

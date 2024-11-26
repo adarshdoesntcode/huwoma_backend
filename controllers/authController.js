@@ -43,13 +43,16 @@ const handleNewAdmin = async (req, res) => {
 
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
-    await Admin.create({
+    const newAdmin = await Admin.create({
       fullname: fullname,
       email: email,
       password: hashedPassword,
       phoneNumber: phoneNumber,
       role: [role],
     });
+
+    await redis.set(`admin:${newAdmin.email}`, JSON.stringify(newAdmin));
+    await redis.del("admin:all");
 
     await sendEmail({
       to: email,
@@ -84,7 +87,16 @@ const handleNewAdmin = async (req, res) => {
 
 const getAllAdmins = async (req, res) => {
   try {
-    const admins = await Admin.find().select("-password -refreshToken -OTP");
+    let admins = await redis.get("admin:all");
+    if (!admins) {
+      admins = await Admin.find().select("-password -refreshToken -OTP");
+      if (admins) {
+        await redis.set("admin:all", JSON.stringify(admins));
+      }
+    } else {
+      admins = JSON.parse(admins);
+    }
+    // const admins = await Admin.find().select("-password -refreshToken -OTP");
     return successResponse(res, 200, "All Admins", admins);
   } catch (err) {
     return errorResponse(res, 500, err.message);
@@ -107,6 +119,12 @@ const handleUpdateAdmin = async (req, res) => {
     if (role) adminToUpdate.role = role;
 
     await adminToUpdate.save();
+
+    await redis.set(
+      `admin:${adminToUpdate.email}`,
+      JSON.stringify(adminToUpdate)
+    );
+    await redis.del("admin:all");
 
     return successResponse(res, 200, "Admin updated successfully");
   } catch (err) {
@@ -134,6 +152,9 @@ const handleDeleteAdmin = async (req, res) => {
 
     await Admin.findByIdAndDelete(adminId);
 
+    await redis.del(`admin:${adminToDelete.email}`);
+    await redis.del("admin:all");
+
     return successResponse(
       res,
       200,
@@ -156,16 +177,23 @@ const handleLogin = async (req, res) => {
 
     let foundUser;
 
-    foundUser = await Admin.findOne({
-      email: email,
-    });
+    const cachedUser = await redis.get(`admin:${email.toLowerCase()}`);
+
+    if (cachedUser) {
+      foundUser = JSON.parse(cachedUser);
+    } else {
+      foundUser = await Admin.findOne({
+        email: email,
+      });
+      if (foundUser) {
+        await redis.set(`admin:${email}`, JSON.stringify(foundUser));
+      }
+    }
 
     if (!foundUser)
       return res.status(401).json({
         message: "Unauthorized User",
       });
-
-    await redis.set(`admin:${email}`, JSON.stringify(foundUser));
 
     let match;
     try {
@@ -198,9 +226,12 @@ const handleLogin = async (req, res) => {
       if (!refreshToken)
         return res.status(400).send("Refresh Token creation fail");
 
-      await redis.set(`refresh:${refreshToken}`, JSON.stringify(foundUser), {
-        EX: 2593000, // 30 days from now
-      });
+      await redis.set(
+        `refresh:${refreshToken}`,
+        JSON.stringify(foundUser),
+        "EX",
+        30 * 24 * 60 * 60
+      );
 
       setCookie(res, refreshToken);
 
@@ -290,7 +321,7 @@ const handleRefreshToken = async (req, res) => {
 
     const refreshToken = cookies.jwt;
     // check for user found or not
-    const foundUser = await redis.get(`refresh:${refreshToken}`);
+    const cachedUser = await redis.get(`refresh:${refreshToken}`);
 
     // if (!user) {
     //   return res.sendStatus(403); //Forbidden
@@ -299,7 +330,9 @@ const handleRefreshToken = async (req, res) => {
     //   "refreshTokens.token": refreshToken, // Searches for a specific token in the refreshTokens array
     // });
 
-    if (!foundUser) return res.sendStatus(403);
+    if (!cachedUser) return res.sendStatus(403);
+
+    const foundUser = JSON.parse(cachedUser);
 
     jwt.verify(
       refreshToken,
@@ -338,8 +371,9 @@ const updateAdminProfile = async (req, res) => {
     confirmPassword,
   } = req.body;
 
+  let admin;
   try {
-    const admin = await Admin.findById(id);
+    admin = await Admin.findById(id);
 
     if (!admin) {
       return errorResponse(res, 404, "Admin not found");
@@ -405,6 +439,9 @@ const updateAdminProfile = async (req, res) => {
   } catch (error) {
     console.error(error);
     return errorResponse(res, 500, "Server error", error.message);
+  } finally {
+    await redis.del(`admin:${admin.email}`);
+    await redis.del(`admin:all`);
   }
 };
 
