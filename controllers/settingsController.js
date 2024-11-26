@@ -10,6 +10,7 @@ const { errorResponse, successResponse } = require("./utils/reponse");
 const POSAccess = require("../models/POSAccess");
 const SimRacingRig = require("../models/SimRacingRig");
 const ParkingVehicleType = require("../models/ParkingVehicleType");
+const redis = require("../config/redisConn");
 
 //====================VEHICLE TYPE======================
 
@@ -28,6 +29,7 @@ const createVehicleType = async (req, res) => {
     });
 
     const savedVehicleType = await newVehicleType.save();
+    await redis.del("carwash:vehicles");
 
     return successResponse(
       res,
@@ -42,12 +44,21 @@ const createVehicleType = async (req, res) => {
 
 const getAllVehicleType = async (req, res) => {
   try {
-    const activeVehicleTypes = await CarWashVehicleType.find({
-      vehicleTypeOperational: true,
-    }).populate({
-      path: "services",
-      match: { serviceTypeOperational: true },
-    });
+    let activeVehicleTypes;
+
+    const cachedVehicles = await redis.get("carwash:vehicles");
+
+    if (!cachedVehicles) {
+      activeVehicleTypes = await CarWashVehicleType.find({
+        vehicleTypeOperational: true,
+      }).populate({
+        path: "services",
+        match: { serviceTypeOperational: true },
+      });
+      await redis.set("carwash:vehicles", JSON.stringify(activeVehicleTypes));
+    } else {
+      activeVehicleTypes = JSON.parse(cachedVehicles);
+    }
 
     if (activeVehicleTypes.length === 0) {
       return successResponse(res, 204, "No Content", activeVehicleTypes);
@@ -102,6 +113,8 @@ const updateVehicleType = async (req, res) => {
       return errorResponse(res, 404, "Vehicle type not found");
     }
 
+    await redis.del("carwash:vehicles");
+
     return successResponse(
       res,
       200,
@@ -132,6 +145,8 @@ const deleteVehicleType = async (req, res) => {
       { _id: { $in: vehicleType.services } },
       { serviceTypeOperational: false }
     );
+
+    await redis.del("carwash:vehicles");
 
     return successResponse(res, 200, "Config deactivated", vehicleType);
   } catch (error) {
@@ -179,6 +194,8 @@ const createServiceType = async (req, res) => {
     }
 
     await vehicleType.save();
+
+    await redis.del("carwash:vehicles");
 
     return successResponse(
       res,
@@ -294,6 +311,8 @@ const updateServiceType = async (req, res) => {
     vehicleType.services = allServiceIds;
     await vehicleType.save();
 
+    await redis.del("carwash:vehicles");
+
     return successResponse(
       res,
       200,
@@ -328,6 +347,8 @@ const deleteServiceType = async (req, res) => {
       message: "Service Type soft deleted successfully",
       serviceType,
     });
+
+    await redis.del("carwash:vehicles");
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
@@ -488,6 +509,11 @@ const createInspectionTemplate = async (req, res) => {
       }
     }
 
+    await redis.set(
+      "carwash:inspection",
+      JSON.stringify([...updatedInspections, ...createdInspections])
+    );
+
     return successResponse(res, 200, "Inspections processed successfully", {
       ...updatedInspections,
       ...createdInspections,
@@ -504,9 +530,20 @@ const createInspectionTemplate = async (req, res) => {
 
 const getInspectionTemplate = async (req, res) => {
   try {
-    const inspectionTemplates = await InspectionTemplate.find().select(
-      "-__v -createdAt -updatedAt"
-    );
+    let inspectionTemplates = await redis.get("carwash:inspection");
+
+    if (!inspectionTemplates) {
+      inspectionTemplates = await InspectionTemplate.find().select(
+        "-__v -createdAt -updatedAt"
+      );
+
+      await redis.set(
+        "carwash:inspection",
+        JSON.stringify(inspectionTemplates)
+      );
+    } else {
+      inspectionTemplates = JSON.parse(inspectionTemplates);
+    }
 
     if (!inspectionTemplates || inspectionTemplates.length === 0) {
       return successResponse(
@@ -531,7 +568,7 @@ const getInspectionTemplate = async (req, res) => {
 const updateInspectionTemplate = async (req, res) => {
   try {
     const { templateId, categories } = req.body;
-    console.log(templateId, categories);
+
     const updatedTemplate = await InspectionTemplate.findByIdAndUpdate(
       templateId,
       { categories },
@@ -541,6 +578,8 @@ const updateInspectionTemplate = async (req, res) => {
     if (!updatedTemplate) {
       return errorResponse(res, 404, "Inspection template not found");
     }
+
+    await redis.set("carwash:inspection", JSON.stringify(updatedTemplate));
 
     return successResponse(
       res,
