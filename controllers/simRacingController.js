@@ -711,9 +711,9 @@ const simracingCheckout = async (req, res) => {
     //   },
     // }, { session });
 
+    await redis.del("simracing:transactions_today");
     await session.commitTransaction();
     session.endSession();
-    await redis.del("simracing:transactions_today");
 
     return successResponse(
       res,
@@ -733,6 +733,8 @@ const simracingCheckout = async (req, res) => {
   }
 };
 const cancelRace = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
     const transactionId = req.params.id;
 
@@ -748,22 +750,43 @@ const cancelRace = async (req, res) => {
       },
       {
         new: true,
+        session,
       }
     );
 
-    await SimRacingRig.findByIdAndUpdate(transaction.rig, {
-      $unset: {
-        activeRacer: "",
-        activeTransaction: "",
-      },
-      $set: {
-        rigStatus: "Pit Stop",
-      },
-    });
-
     if (!transaction) {
+      await session.abortTransaction();
+      session.endSession();
       return errorResponse(res, 404, "Transaction not found.");
     }
+
+    await SimRacingRig.findByIdAndUpdate(
+      transaction.rig,
+      {
+        $unset: {
+          activeRacer: "",
+          activeTransaction: "",
+        },
+        $set: {
+          rigStatus: "Pit Stop",
+        },
+      },
+      { session }
+    );
+
+    await redis.del("simracing:transactions_today");
+
+    new SystemActivity({
+      description: `${transaction.billNo} race cancelled`,
+      activityType: "Cancelled",
+      systemModule: "SimRacing Transaction",
+      activityBy: req.userId,
+      activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+      userAgent: req.headers["user-agent"],
+    }).save();
+
+    await session.commitTransaction();
+    session.endSession();
 
     return successResponse(
       res,
@@ -773,6 +796,8 @@ const cancelRace = async (req, res) => {
     );
   } catch (err) {
     console.error(err);
+    await session.abortTransaction();
+    session.endSession();
     return errorResponse(
       res,
       500,
@@ -780,7 +805,10 @@ const cancelRace = async (req, res) => {
     );
   }
 };
+
 const deleteTransaction = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
     const transactionId = req.params.id;
 
@@ -796,12 +824,29 @@ const deleteTransaction = async (req, res) => {
       },
       {
         new: true,
+        session,
       }
     );
 
     if (!transaction) {
+      await session.abortTransaction();
+      session.endSession();
       return errorResponse(res, 404, "Transaction not found.");
     }
+
+    await redis.del("simracing:transactions_today");
+
+    new SystemActivity({
+      description: `${transaction.billNo} booking cancelled`,
+      activityType: "Cancelled",
+      systemModule: "SimRacing Transaction",
+      activityBy: req.userId,
+      activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+      userAgent: req.headers["user-agent"],
+    }).save();
+
+    await session.commitTransaction();
+    session.endSession();
 
     return successResponse(
       res,
@@ -810,6 +855,9 @@ const deleteTransaction = async (req, res) => {
       transaction
     );
   } catch (err) {
+    console.error(err);
+    await session.abortTransaction();
+    session.endSession();
     return errorResponse(
       res,
       500,
@@ -889,7 +937,7 @@ const rollbackFromCompleted = async (req, res) => {
               $set: {
                 rigStatus: "On Track",
               },
-              $pull: { rigTransactions: transaction._id },
+              // $pull: { rigTransactions: transaction._id },
             }
           );
 
@@ -901,6 +949,17 @@ const rollbackFromCompleted = async (req, res) => {
               `Rollback when ${transaction.rig.rigName} is available`
             );
           }
+
+          await redis.del("simracing:transactions_today");
+
+          new SystemActivity({
+            description: `${transaction.billNo} rolled back to "Active"`,
+            activityType: "Rollback",
+            systemModule: "SimRacing Transaction",
+            activityBy: req.userId,
+            activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+            userAgent: req.headers["user-agent"],
+          }).save();
 
           await session.commitTransaction();
           return successResponse(
@@ -930,6 +989,16 @@ const rollbackFromCompleted = async (req, res) => {
 const clientStartRace = async (req, res) => {
   try {
     const { coordinates } = req.body;
+
+    new SystemActivity({
+      description: `QR code scanned from ${coordinates.longitude}, ${coordinates.latitude}`,
+      activityType: "QR Scan",
+      systemModule: "SimRacing QR",
+      activityBy: req.userId || "Guest",
+      activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+      userAgent: req.headers["user-agent"],
+    }).save();
+
     if (!coordinates || !coordinates.longitude || !coordinates.latitude) {
       return errorResponse(res, 400, "Coordinates are required");
     }
@@ -1003,96 +1072,140 @@ const clientStartRace = async (req, res) => {
 const startRaceFromClient = async (req, res) => {
   try {
     const { customerName, customerContact, rigId } = req.body;
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      const rig = await SimRacingRig.findOne({
+        _id: rigId,
+        rigStatus: "Pit Stop",
+      }).session(session);
+      if (!rig) {
+        await session.abortTransaction();
+        session.endSession();
+        return errorResponse(res, 400, "Rig is not available");
+      }
 
-    const rig = await SimRacingRig.findOne({
-      _id: rigId,
-      rigStatus: "Pit Stop",
-    });
-    if (!rig) {
-      return errorResponse(res, 400, "Rig is not available");
-    }
+      let customer = await SimRacingCustomer.findOne({
+        customerContact,
+      }).session(session);
 
-    let customer = await SimRacingCustomer.findOne({ customerContact });
+      if (!customer) {
+        customer = new SimRacingCustomer({ customerName, customerContact });
+        await customer.save({ session: session });
+      }
 
-    if (!customer) {
-      customer = new SimRacingCustomer({ customerName, customerContact });
-      await customer.save();
-    }
-    const existingTransaction = await SimRacingTransaction.findOne({
-      customer: customer,
-      transactionStatus: {
-        $not: {
-          $in: ["Completed", "Cancelled"],
+      const existingTransaction = await SimRacingTransaction.findOne({
+        customer: customer,
+        transactionStatus: {
+          $not: {
+            $in: ["Completed", "Cancelled"],
+          },
         },
-      },
-      paymentStatus: {
-        $not: {
-          $in: ["Paid", "Cancelled"],
+        paymentStatus: {
+          $not: {
+            $in: ["Paid", "Cancelled"],
+          },
         },
-      },
-    });
+      }).session(session);
 
-    if (existingTransaction) {
+      if (existingTransaction) {
+        await session.abortTransaction();
+        session.endSession();
+        return errorResponse(
+          res,
+          400,
+          "A transaction for the  customer already exists."
+        );
+      }
+
+      const now = new Date();
+      const raceStartDateObj = new Date(now);
+      const clientDate = now.toISOString();
+
+      let billNo;
+      let existingBillNo;
+
+      do {
+        billNo = generateRaceBillNo(clientDate);
+        existingBillNo = await SimRacingTransaction.findOne({ billNo }).session(
+          session
+        );
+      } while (existingBillNo);
+
+      const simRacingTransaction = new SimRacingTransaction({
+        billNo,
+        rig: rigId,
+        customer: customer._id,
+        start: raceStartDateObj,
+        transactionStatus: "Active",
+        paymentStatus: "Pending",
+      });
+
+      await simRacingTransaction.save({ session: session });
+
+      await SimRacingCustomer.findByIdAndUpdate(
+        customer._id,
+        {
+          $push: { customerTransactions: simRacingTransaction._id },
+        },
+        { session: session }
+      );
+
+      await SimRacingRig.findByIdAndUpdate(
+        rigId,
+        {
+          $set: {
+            activeRacer: customer._id,
+            activeTransaction: simRacingTransaction._id,
+            rigStatus: "On Track",
+          },
+          // $push: { rigTransactions: simRacingTransaction._id },
+        },
+        { session: session }
+      );
+
+      await redis.del("simracing:transactions_today");
+
+      new SystemActivity({
+        description: `Race Started by (${customerName})`,
+        activityType: "Start Race",
+        systemModule: "SimRacing Transaction",
+        activityBy: customer._id,
+        activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+        userAgent: req.headers["user-agent"],
+      }).save();
+
+      await session.commitTransaction();
+      session.endSession();
+
+      const tokenPayload = {
+        transactionId: simRacingTransaction._id,
+        customerId: customer._id,
+        rigId: rigId,
+      };
+
+      const token = jwt.sign(tokenPayload, process.env.SIM_RACING_SECRET);
+
+      return successResponse(
+        res,
+        201,
+        "Sim Racing transaction started successfully.",
+        {
+          simRacingTransaction,
+          simRacingKey: token,
+        }
+      );
+    } catch (error) {
+      await session.abortTransaction();
+      session.endSession();
+      console.error(error);
       return errorResponse(
         res,
-        400,
-        "A transaction for the  customer already exists."
+        500,
+        "Server error. Failed to start transaction.",
+        error.message
       );
     }
-
-    const now = new Date();
-    const raceStartDateObj = new Date(now);
-    const clientDate = now.toISOString();
-
-    let billNo;
-    let existingBillNo;
-
-    do {
-      billNo = generateRaceBillNo(clientDate);
-      existingBillNo = await SimRacingTransaction.findOne({ billNo });
-    } while (existingBillNo);
-
-    const simRacingTransaction = new SimRacingTransaction({
-      billNo,
-      rig: rigId,
-      customer: customer._id,
-      start: raceStartDateObj,
-      transactionStatus: "Active",
-      paymentStatus: "Pending",
-    });
-
-    await simRacingTransaction.save();
-
-    await SimRacingCustomer.findByIdAndUpdate(customer._id, {
-      $push: { customerTransactions: simRacingTransaction._id },
-    });
-
-    await SimRacingRig.findByIdAndUpdate(rigId, {
-      $set: {
-        activeRacer: customer._id,
-        activeTransaction: simRacingTransaction._id,
-        rigStatus: "On Track",
-      },
-      // $push: { rigTransactions: simRacingTransaction._id },
-    });
-
-    const tokenPayload = {
-      transactionId: simRacingTransaction._id,
-      customerId: customer._id,
-      rigId: rigId,
-    };
-
-    const token = jwt.sign(tokenPayload, process.env.SIM_RACING_SECRET);
-
-    return successResponse(
-      res,
-      201,
-      "Sim Racing transaction started successfully.",
-      {
-        simRacingTransaction,
-        simRacingKey: token,
-      }
-    );
   } catch (error) {
     console.error(error);
     return errorResponse(

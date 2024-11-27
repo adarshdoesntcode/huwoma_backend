@@ -17,6 +17,8 @@ const SystemActivitySchema = new Schema(
         "Booking",
         "Create",
         "Login",
+        "QR Scan",
+        "Start Race",
         "Logout",
         "Update",
         "Cancelled",
@@ -29,8 +31,7 @@ const SystemActivitySchema = new Schema(
       trim: true,
     },
     activityBy: {
-      type: Schema.Types.ObjectId,
-      ref: "Admin",
+      type: Schema.Types.Mixed,
       required: false,
     },
     activityIpAddress: {
