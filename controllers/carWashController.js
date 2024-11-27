@@ -382,6 +382,7 @@ const transactionStartFromBooking = async (req, res) => {
       // serviceStart,
       serviceRate,
       actualRate,
+      hour,
     } = req.body;
 
     const now = new Date();
@@ -462,11 +463,7 @@ const transactionStartFromBooking = async (req, res) => {
     // await existingService.save({ session });
 
     await redis.del("carwash:transactions_today");
-    await redis.hincrby(
-      "carwash_hourly_count",
-      serviceStartDateObj.getHours(),
-      1
-    );
+    await redis.hincrby("carwash_hourly_count", hour, 1);
 
     await session.commitTransaction();
     session.endSession();
@@ -655,6 +652,7 @@ const transactionThree = async (req, res) => {
       paymentStatus,
       paymentMode,
       parkingIn,
+      serviceCost,
       parkingOut,
       parkingCost,
       grossAmount,
@@ -713,6 +711,7 @@ const transactionThree = async (req, res) => {
         transactionStatus,
         paymentStatus,
         paymentMode,
+        "service.cost": serviceCost,
         parking: {
           in: parkingInDateObj,
           out: parkingOutDateObj,
@@ -830,6 +829,7 @@ const getCheckoutDetails = async (req, res) => {
       paymentModes = await PaymentMode.find({
         paymentModeOperational: true,
       });
+      await redis.set("carwash:payment_modes", JSON.stringify(paymentModes));
     }
 
     return successResponse(
