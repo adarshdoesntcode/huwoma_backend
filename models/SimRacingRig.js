@@ -24,12 +24,12 @@ const SimRacingRigSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: "SimRacingTransaction",
     },
-    rigTransactions: [
-      {
-        type: Schema.Types.ObjectId,
-        ref: "SimRacingTransaction",
-      },
-    ],
+    // rigTransactions: [
+    //   {
+    //     type: Schema.Types.ObjectId,
+    //     ref: "SimRacingTransaction",
+    //   },
+    // ],
   },
   {
     timestamps: true,

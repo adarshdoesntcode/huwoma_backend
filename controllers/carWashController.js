@@ -493,7 +493,7 @@ const transactionOne = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
-    const { service, vehicleNumber, customer, actualRate, serviceRate } =
+    const { service, vehicleNumber, customer, actualRate, serviceRate, hour } =
       req.body;
 
     const now = new Date();
@@ -577,11 +577,7 @@ const transactionOne = async (req, res) => {
 
     await redis.del("carwash:transactions_today");
 
-    await redis.hincrby(
-      "carwash_hourly_count",
-      serviceStartDateObj.getHours(),
-      1
-    );
+    await redis.hincrby("carwash_hourly_count", hour, 1);
 
     await session.commitTransaction();
     session.endSession();

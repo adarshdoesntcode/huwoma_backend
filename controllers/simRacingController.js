@@ -264,40 +264,10 @@ const getSimracingTransactions = async (req, res) => {
     const endOfDay = new Date(nowDateObj);
     endOfDay.setUTCHours(23, 59, 59, 999);
 
-    const operationalRigs = await SimRacingRig.aggregate([
-      {
-        $match: { rigOperational: true },
-      },
-      {
-        $lookup: {
-          from: "simracingtransactions",
-          localField: "_id",
-          foreignField: "rig",
-          as: "rigTransactions",
-        },
-      },
-      {
-        $addFields: {
-          completedPaidTransactionCount: {
-            $size: {
-              $filter: {
-                input: "$rigTransactions",
-                as: "transaction",
-                cond: {
-                  $and: [
-                    { $eq: ["$$transaction.paymentStatus", "Paid"] },
-                    { $eq: ["$$transaction.transactionStatus", "Completed"] },
-                  ],
-                },
-              },
-            },
-          },
-        },
-      },
-      {
-        $project: { rigTransactions: 0 },
-      },
-    ]);
+    const operationalRigs = await SimRacingRig.find({
+      rigStatus: "Pit Stop",
+      rigOperational: true,
+    }).populate("activeRacer");
 
     const transactions = await SimRacingTransaction.find({
       $or: [
@@ -350,6 +320,7 @@ const getSimracingTransactions = async (req, res) => {
       }
     );
   } catch (err) {
+    console.error(err);
     return errorResponse(
       res,
       500,
@@ -418,7 +389,7 @@ const raceStart = async (req, res) => {
         activeTransaction: simRacingTransaction._id,
         rigStatus: "On Track",
       },
-      $push: { rigTransactions: simRacingTransaction._id },
+      // $push: { rigTransactions: simRacingTransaction._id },
     });
 
     return successResponse(

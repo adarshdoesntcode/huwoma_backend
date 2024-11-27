@@ -1,5 +1,5 @@
 const CarWashVehicleType = require("../models/CarWashVehicleType");
-const PackageType = require("../models/PackageType");
+// const PackageType = require("../models/PackageType");
 const PaymentMode = require("../models/PaymentMode");
 const ServiceType = require("../models/ServiceType");
 const Configuration = require("../models/Configuration");
@@ -672,6 +672,18 @@ const createNewSimRacingRig = async (req, res) => {
 
   try {
     const savedRig = await newRig.save();
+
+    await redis.del("simracing:rig");
+
+    new SystemActivity({
+      description: `${savedRig.rigName} created.`,
+      activityType: "Create",
+      systemModule: "SimRacing Rig",
+      activityBy: req.userId,
+      activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+      userAgent: req.headers["user-agent"],
+    }).save();
+
     return successResponse(
       res,
       201,
@@ -701,6 +713,17 @@ const updateSimRacingRig = async (req, res) => {
     if (!updatedRig) {
       return errorResponse(res, 404, "Sim Racing rig not found");
     }
+
+    await redis.del("simracing:rig");
+
+    new SystemActivity({
+      description: `${updatedRig.rigName} updated.`,
+      activityType: "Update",
+      systemModule: "SimRacing Rig",
+      activityBy: req.userId,
+      activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+      userAgent: req.headers["user-agent"],
+    }).save();
 
     return successResponse(
       res,
@@ -742,6 +765,17 @@ const deleteSimRacingRig = async (req, res) => {
       return errorResponse(res, 404, "Sim Racing rig not found");
     }
 
+    await redis.del("simracing:rig");
+
+    new SystemActivity({
+      description: `${rig.rigName} deleted.`,
+      activityType: "Delete",
+      systemModule: "SimRacing Rig",
+      activityBy: req.userId,
+      activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+      userAgent: req.headers["user-agent"],
+    }).save();
+
     return successResponse(
       res,
       200,
@@ -756,7 +790,21 @@ const deleteSimRacingRig = async (req, res) => {
 
 const getAllSimRacingRigs = async (req, res) => {
   try {
-    const operationalRigs = await SimRacingRig.find({ rigOperational: true });
+    let operationalRigs;
+
+    const cachedRigs = await redis.get("simracing:rig");
+
+    if (cachedRigs) {
+      operationalRigs = JSON.parse(cachedRigs);
+    } else {
+      operationalRigs = await SimRacingRig.find({ rigOperational: true });
+      await redis.set("simracing:rig", JSON.stringify(operationalRigs));
+    }
+
+    if (operationalRigs.length === 0) {
+      return errorResponse(res, 204, "No operational Sim Racing rigs");
+    }
+
     return successResponse(
       res,
       200,
@@ -787,7 +835,16 @@ const updateSimRacingCoordinates = async (req, res) => {
         new: true,
       }
     );
+    await redis.del("simracing:coordinates");
 
+    new SystemActivity({
+      description: `Sim racing coordinates updated.`,
+      activityType: "Update",
+      systemModule: "SimRacing Coordinates",
+      activityBy: req.userId,
+      activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+      userAgent: req.headers["user-agent"],
+    });
     return successResponse(
       res,
       200,
@@ -802,9 +859,19 @@ const updateSimRacingCoordinates = async (req, res) => {
 
 const getSimRacingCoordinates = async (req, res) => {
   try {
-    const configuration = await Configuration.findOne().select(
-      "simRacingCoordinates"
-    );
+    let configuration;
+
+    const cachedCoordinates = await redis.get("simracing:coordinates");
+
+    if (cachedCoordinates) {
+      configuration = JSON.parse(cachedCoordinates);
+    } else {
+      configuration = await Configuration.findOne().select(
+        "simRacingCoordinates"
+      );
+      await redis.set("simracing:coordinates", JSON.stringify(configuration));
+    }
+
     return successResponse(
       res,
       200,
