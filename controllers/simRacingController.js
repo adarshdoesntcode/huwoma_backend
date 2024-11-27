@@ -312,7 +312,7 @@ const getSimracingTransactions = async (req, res) => {
     if (cachedTransactions) {
       transactions = JSON.parse(cachedTransactions);
     } else {
-      const transactions = await SimRacingTransaction.find({
+      transactions = await SimRacingTransaction.find({
         $or: [
           {
             $or: [
