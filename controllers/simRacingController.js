@@ -994,7 +994,7 @@ const clientStartRace = async (req, res) => {
       description: `QR code scanned from ${coordinates.longitude}, ${coordinates.latitude}`,
       activityType: "QR Scan",
       systemModule: "SimRacing QR",
-      activityBy: req.userId || "Guest",
+      activityBy: req.userId,
       activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
       userAgent: req.headers["user-agent"],
     }).save();
