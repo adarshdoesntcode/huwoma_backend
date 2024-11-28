@@ -40,6 +40,7 @@ app.use("/api/pos", verifyPOSAccessToken, require("./routes/pos"));
 app.use("/api/settings", verifyJWT, require("./routes/settings"));
 app.use("/api/carwash", verifyJWT, require("./routes/carwash"));
 app.use("/api/parking", verifyJWT, require("./routes/parking"));
+app.use("/api/systemactivity", verifyJWT, require("./routes/system-activity"));
 
 if (process.env.NODE_ENV !== "production") {
   const PORT = process.env.PORT || 5000;

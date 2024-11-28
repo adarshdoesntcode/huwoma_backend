@@ -31,7 +31,8 @@ const SystemActivitySchema = new Schema(
       trim: true,
     },
     activityBy: {
-      type: Schema.Types.Mixed,
+      type: Schema.Types.ObjectId,
+      ref: "Admin",
       required: false,
     },
     activityIpAddress: {

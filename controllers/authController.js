@@ -287,8 +287,14 @@ const handleLogout = async (req, res) => {
 
   const refreshToken = cookies.jwt;
 
+  let foundUser;
   // Check if user exists with the provided refresh token
-  const foundUser = await redis.get(`refresh:${refreshToken}`);
+  const cachedUser = await redis.get(`refresh:${refreshToken}`);
+
+  if (cachedUser) {
+    foundUser = JSON.parse(cachedUser);
+  }
+
   // const foundUser = await Admin.findOne({
   //   "refreshTokens.token": refreshToken,
   // });
