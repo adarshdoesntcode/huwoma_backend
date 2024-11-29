@@ -942,16 +942,14 @@ const rollbackFromCompleted = async (req, res) => {
 
           const rig = await SimRacingRig.findOneAndUpdate(
             { _id: transaction.rig, rigStatus: "Pit Stop" },
+
             {
-              $unset: {
-                activeRacer: transaction.customer,
-                activeTransaction: transaction._id,
-              },
-              $set: {
-                rigStatus: "On Track",
-              },
-              // $pull: { rigTransactions: transaction._id },
+              activeRacer: transaction.customer,
+              activeTransaction: transaction._id,
+              rigStatus: "On Track",
             }
+
+            // $pull: { rigTransactions: transaction._id },
           );
 
           if (!rig) {
