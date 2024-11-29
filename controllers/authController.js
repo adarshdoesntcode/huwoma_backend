@@ -51,7 +51,12 @@ const handleNewAdmin = async (req, res) => {
       role: [role],
     });
 
-    await redis.set(`admin:${newAdmin.email}`, JSON.stringify(newAdmin));
+    await redis.set(
+      `admin:${newAdmin.email}`,
+      JSON.stringify(newAdmin),
+      "EX",
+      60 * 60 * 24
+    );
     await redis.del("admin:all");
 
     await sendEmail({
@@ -91,7 +96,12 @@ const getAllAdmins = async (req, res) => {
     if (!admins) {
       admins = await Admin.find().select("-password -refreshToken -OTP");
       if (admins) {
-        await redis.set("admin:all", JSON.stringify(admins));
+        await redis.set(
+          "admin:all",
+          JSON.stringify(admins),
+          "EX",
+          60 * 60 * 24
+        );
       }
     } else {
       admins = JSON.parse(admins);
@@ -122,7 +132,9 @@ const handleUpdateAdmin = async (req, res) => {
 
     await redis.set(
       `admin:${adminToUpdate.email}`,
-      JSON.stringify(adminToUpdate)
+      JSON.stringify(adminToUpdate),
+      "EX",
+      60 * 60 * 24
     );
     await redis.del("admin:all");
 
@@ -204,7 +216,12 @@ const handleLogin = async (req, res) => {
         email: email,
       });
       if (foundUser) {
-        await redis.set(`admin:${email}`, JSON.stringify(foundUser));
+        await redis.set(
+          `admin:${email}`,
+          JSON.stringify(foundUser),
+          "EX",
+          60 * 60 * 24
+        );
       }
     }
 

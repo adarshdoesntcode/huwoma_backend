@@ -65,7 +65,12 @@ const getAllVehicleType = async (req, res) => {
         path: "services",
         match: { serviceTypeOperational: true },
       });
-      await redis.set("carwash:vehicles", JSON.stringify(activeVehicleTypes));
+      await redis.set(
+        "carwash:vehicles",
+        JSON.stringify(activeVehicleTypes),
+        "EX",
+        60 * 60 * 24
+      );
     } else {
       activeVehicleTypes = JSON.parse(cachedVehicles);
     }
@@ -575,7 +580,9 @@ const createInspectionTemplate = async (req, res) => {
 
     await redis.set(
       "carwash:inspection",
-      JSON.stringify([...updatedInspections, ...createdInspections])
+      JSON.stringify([...updatedInspections, ...createdInspections]),
+      "EX",
+      60 * 60 * 24
     );
 
     return successResponse(res, 200, "Inspections processed successfully", {
@@ -603,7 +610,9 @@ const getInspectionTemplate = async (req, res) => {
 
       await redis.set(
         "carwash:inspection",
-        JSON.stringify(inspectionTemplates)
+        JSON.stringify(inspectionTemplates),
+        "EX",
+        60 * 60 * 24
       );
     } else {
       inspectionTemplates = JSON.parse(inspectionTemplates);
@@ -798,7 +807,12 @@ const getAllSimRacingRigs = async (req, res) => {
       operationalRigs = JSON.parse(cachedRigs);
     } else {
       operationalRigs = await SimRacingRig.find({ rigOperational: true });
-      await redis.set("simracing:rig", JSON.stringify(operationalRigs));
+      await redis.set(
+        "simracing:rig",
+        JSON.stringify(operationalRigs),
+        "EX",
+        60 * 60 * 24
+      );
     }
 
     if (operationalRigs.length === 0) {
@@ -869,7 +883,12 @@ const getSimRacingCoordinates = async (req, res) => {
       configuration = await Configuration.findOne().select(
         "simRacingCoordinates"
       );
-      await redis.set("simracing:coordinates", JSON.stringify(configuration));
+      await redis.set(
+        "simracing:coordinates",
+        JSON.stringify(configuration),
+        "EX",
+        60 * 60 * 24
+      );
     }
 
     return successResponse(
@@ -888,9 +907,23 @@ const getSimRacingCoordinates = async (req, res) => {
 
 const getAllParkingVehicles = async (req, res) => {
   try {
-    const parkingVehicles = await ParkingVehicleType.find({
-      vehicleTypeOperational: true,
-    });
+    let parkingVehicles;
+
+    const cachedVehicles = await redis.get("parking:vehicles");
+
+    if (cachedVehicles) {
+      parkingVehicles = JSON.parse(cachedVehicles);
+    } else {
+      parkingVehicles = await ParkingVehicleType.find({
+        vehicleTypeOperational: true,
+      });
+      await redis.set(
+        "parking:vehicles",
+        JSON.stringify(parkingVehicles),
+        "EX",
+        60 * 60 * 24
+      );
+    }
 
     if (parkingVehicles.length === 0) {
       return errorResponse(res, 204, "No parking vehicles available");
@@ -938,6 +971,17 @@ const createParkingVehicleType = async (req, res) => {
 
     const savedParkingVehicleType = await newParkingVehicleType.save();
 
+    await redis.del("parking:vehicles");
+
+    new SystemActivity({
+      description: `${savedParkingVehicleType.vehicleTypeName} created.`,
+      activityType: "Create",
+      systemModule: "Parking Vehicle",
+      activityBy: req.userId,
+      activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+      userAgent: req.headers["user-agent"],
+    }).save();
+
     return successResponse(
       res,
       201,
@@ -963,6 +1007,17 @@ const updateParkingVehicleType = async (req, res) => {
     if (!updatedParkingVehicleType) {
       return errorResponse(res, 404, "Parking vehicle type not found");
     }
+
+    await redis.del("parking:vehicles");
+
+    new SystemActivity({
+      description: `${updatedParkingVehicleType.vehicleTypeName} updated.`,
+      activityType: "Update",
+      systemModule: "Parking Vehicle",
+      activityBy: req.userId,
+      activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+      userAgent: req.headers["user-agent"],
+    }).save();
 
     return successResponse(
       res,
@@ -990,6 +1045,17 @@ const deleteParkingVehicleType = async (req, res) => {
       return errorResponse(res, 404, "Parking vehicle type not found");
     }
 
+    await redis.del("parking:vehicles");
+
+    new SystemActivity({
+      description: `${vehicleType.vehicleTypeName} deleted.`,
+      activityType: "Delete",
+      systemModule: "Parking Vehicle",
+      activityBy: req.userId,
+      activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+      userAgent: req.headers["user-agent"],
+    }).save();
+
     return successResponse(
       res,
       200,
@@ -1001,6 +1067,7 @@ const deleteParkingVehicleType = async (req, res) => {
     return errorResponse(res, 500, "Server error", error.message);
   }
 };
+
 //====================PAYMENT MODE======================
 
 const createPaymentMode = async (req, res) => {
@@ -1041,8 +1108,13 @@ const getAllPaymentMode = async (req, res) => {
       activePaymentModes = await PaymentMode.find({
         paymentModeOperational: true,
       });
-      if (activePaymentModes.length > 0) {
-        await redis.set("payment:all", JSON.stringify(activePaymentModes));
+      if (activePaymentModes) {
+        await redis.set(
+          "payment:all",
+          JSON.stringify(activePaymentModes),
+          "EX",
+          60 * 60 * 24
+        );
       }
     } else {
       activePaymentModes = JSON.parse(cachedPayment);

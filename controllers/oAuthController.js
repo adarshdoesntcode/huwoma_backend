@@ -94,7 +94,12 @@ const googleOauthHandler = async (req, res) => {
         email: googleUser.email,
       });
       if (validUser) {
-        await redis.set(`admin:${googleUser.email}`, JSON.stringify(validUser));
+        await redis.set(
+          `admin:${googleUser.email}`,
+          JSON.stringify(validUser),
+          "EX",
+          60 * 60 * 24
+        );
       }
     }
 
@@ -129,7 +134,9 @@ const googleOauthHandler = async (req, res) => {
       if (updatedUser) {
         await redis.set(
           `admin:${googleUser.email}`,
-          JSON.stringify(updatedUser)
+          JSON.stringify(updatedUser),
+          "EX",
+          60 * 60 * 24
         );
       }
     }

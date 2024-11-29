@@ -6,6 +6,7 @@ const InspectionTemplate = require("../models/InspectionTemplate");
 const PaymentMode = require("../models/PaymentMode");
 const ServiceType = require("../models/ServiceType");
 const SystemActivity = require("../models/SystemActivity");
+const { incrementVisitorCount } = require("./utils/redisUtils");
 const { errorResponse, successResponse } = require("./utils/reponse");
 const { generateBillNo } = require("./utils/utils");
 const mongoose = require("mongoose");
@@ -383,6 +384,7 @@ const transactionStartFromBooking = async (req, res) => {
       serviceRate,
       actualRate,
       hour,
+      today,
     } = req.body;
 
     const now = new Date();
@@ -463,7 +465,11 @@ const transactionStartFromBooking = async (req, res) => {
     // await existingService.save({ session });
 
     await redis.del("carwash:transactions_today");
-    await redis.hincrby("carwash_hourly_count", hour, 1);
+    redis.hincrby("carwash_hourly_count", hour, 1);
+
+    if (today) {
+      incrementVisitorCount("carwash", today, 1);
+    }
 
     await session.commitTransaction();
     session.endSession();
@@ -490,8 +496,15 @@ const transactionOne = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
-    const { service, vehicleNumber, customer, actualRate, serviceRate, hour } =
-      req.body;
+    const {
+      service,
+      vehicleNumber,
+      customer,
+      actualRate,
+      serviceRate,
+      hour,
+      today,
+    } = req.body;
 
     const now = new Date();
     const serviceStartDateObj = new Date(now);
@@ -574,7 +587,11 @@ const transactionOne = async (req, res) => {
 
     await redis.del("carwash:transactions_today");
 
-    await redis.hincrby("carwash_hourly_count", hour, 1);
+    redis.hincrby("carwash_hourly_count", hour, 1);
+
+    if (today) {
+      incrementVisitorCount("carwash", today, 1);
+    }
 
     await session.commitTransaction();
     session.endSession();
@@ -829,7 +846,12 @@ const getCheckoutDetails = async (req, res) => {
       paymentModes = await PaymentMode.find({
         paymentModeOperational: true,
       });
-      await redis.set("carwash:payment_modes", JSON.stringify(paymentModes));
+      await redis.set(
+        "carwash:payment_modes",
+        JSON.stringify(paymentModes),
+        "EX",
+        60 * 60 * 24
+      );
     }
 
     return successResponse(
@@ -874,7 +896,9 @@ const getTransactionForInspection = async (req, res) => {
 
       await redis.set(
         "carwash:inspection",
-        JSON.stringify(inspectionTemplates)
+        JSON.stringify(inspectionTemplates),
+        "EX",
+        60 * 60 * 24
       );
     } else {
       inspectionTemplates = JSON.parse(inspectionTemplates);

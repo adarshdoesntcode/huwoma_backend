@@ -4,6 +4,9 @@ const ParkingVehicleType = require("../models/ParkingVehicleType");
 const PaymentMode = require("../models/PaymentMode");
 const { successResponse, errorResponse } = require("./utils/reponse");
 const { generateParkingBillNo } = require("./utils/utils");
+const { incrementVisitorCount } = require("./utils/redisUtils");
+const redis = require("../config/redisConn");
+const SystemActivity = require("../models/SystemActivity");
 
 const getAvailableVehicles = async (req, res) => {
   try {
@@ -37,36 +40,78 @@ const getParkingTransactions = async (req, res) => {
     const endOfDay = new Date(nowDateObj);
     endOfDay.setUTCHours(23, 59, 59, 999);
 
+    // let operationalVehicles;
+
+    // const cachedVehicles = await redis.get("parking:vehicles");
+
+    // if (cachedVehicles) {
+    //   operationalVehicles = JSON.parse(cachedVehicles);
+    // } else {
+    //   operationalVehicles = await ParkingVehicleType.find({
+    //     vehicleTypeOperational: true,
+    //   });
+    //   await redis.set(
+    //     "parking:vehicles",
+    //     JSON.stringify(operationalVehicles),
+    //     "EX",
+    //     60 * 60 * 24
+    //   );
+    // }
+
     const operationalVehicles = await ParkingVehicleType.find({
       vehicleTypeOperational: true,
     });
 
-    const transactions = await ParkingTransaction.find({
-      $or: [
-        {
-          $or: [
-            {
-              createdAt: {
-                $gte: startOfDay,
-                $lt: endOfDay,
+    const cachedParkingTransactions = await redis.get(
+      "parking:transactions_today"
+    );
+
+    let transactions;
+    if (cachedParkingTransactions) {
+      transactions = JSON.parse(cachedParkingTransactions);
+    } else {
+      transactions = await ParkingTransaction.find({
+        $or: [
+          {
+            $or: [
+              {
+                createdAt: {
+                  $gte: startOfDay,
+                  $lt: endOfDay,
+                },
               },
-            },
-            {
-              transactionTime: {
-                $gte: startOfDay,
-                $lt: endOfDay,
+              {
+                transactionTime: {
+                  $gte: startOfDay,
+                  $lt: endOfDay,
+                },
               },
-            },
-          ],
-        },
-        {
-          $or: [{ transactionStatus: "Parked" }, { paymentStatus: "Pending" }],
-        },
-      ],
-    })
-      .sort({ createdAt: -1 })
-      .populate("vehicle")
-      .populate("paymentMode");
+            ],
+          },
+          {
+            $or: [
+              {
+                transactionStatus: {
+                  $in: ["Booked", "In Queue", "Ready for Pickup"],
+                },
+              },
+              { paymentStatus: "Pending" },
+            ],
+          },
+        ],
+      })
+        .sort({ createdAt: -1 })
+        .populate("vehicle")
+        .populate("paymentMode");
+
+      await redis.set(
+        "parking:transactions_today",
+        JSON.stringify(transactions),
+        "EX",
+        3600
+      );
+    }
+
     return successResponse(
       res,
       200,
@@ -81,13 +126,14 @@ const getParkingTransactions = async (req, res) => {
     return errorResponse(res, 500, "Server error", error.message);
   }
 };
+
 const parkingStart = async (req, res) => {
   const session = await ParkingTransaction.startSession();
 
   try {
     session.startTransaction();
 
-    const { vehicleId, vehicleNumber } = req.body;
+    const { vehicleId, vehicleNumber, today } = req.body;
 
     const now = new Date();
     const parkingStartDateObj = new Date(now);
@@ -170,10 +216,16 @@ const parkingStart = async (req, res) => {
       vehicleId,
       {
         $inc: { currentlyAccomodated: 1 },
-        $push: { parkingTransactions: parkingTransaction._id },
+        // $push: { parkingTransactions: parkingTransaction._id },
       },
       { session }
     );
+
+    await redis.del("parking:transactions_today");
+
+    if (today) {
+      incrementVisitorCount("parking", today, 1);
+    }
 
     await session.commitTransaction();
     session.endSession();
@@ -210,9 +262,29 @@ const getCheckoutDetails = async (req, res) => {
       return errorResponse(res, 404, "Transaction not found.");
     }
 
-    const paymentModes = await PaymentMode.find({
-      paymentModeOperational: true,
-    });
+    let paymentModes;
+
+    const cachedPayment = await redis.get("payment:all");
+
+    if (!cachedPayment) {
+      paymentModes = await PaymentMode.find({
+        paymentModeOperational: true,
+      });
+      if (paymentModes) {
+        await redis.set(
+          "payment:all",
+          JSON.stringify(paymentModes),
+          "EX",
+          60 * 60 * 24
+        );
+      }
+    } else {
+      paymentModes = JSON.parse(cachedPayment);
+    }
+
+    // const paymentModes = await PaymentMode.find({
+    //   paymentModeOperational: true,
+    // });
 
     return successResponse(
       res,
@@ -285,24 +357,26 @@ const parkingCheckout = async (req, res) => {
       { session }
     );
 
-    const paymentModeExists = await PaymentMode.findById(paymentMode).session(
-      session
-    );
-    if (!paymentModeExists) {
-      await session.abortTransaction();
-      session.endSession();
-      return errorResponse(res, 404, "Payment mode not found.");
-    }
+    // const paymentModeExists = await PaymentMode.findById(paymentMode).session(
+    //   session
+    // );
+    // if (!paymentModeExists) {
+    //   await session.abortTransaction();
+    //   session.endSession();
+    //   return errorResponse(res, 404, "Payment mode not found.");
+    // }
 
-    await PaymentMode.findByIdAndUpdate(
-      paymentMode,
-      {
-        $push: {
-          parkingTransactions: transactionId,
-        },
-      },
-      { session }
-    );
+    // await PaymentMode.findByIdAndUpdate(
+    //   paymentMode,
+    //   {
+    //     $push: {
+    //       parkingTransactions: transactionId,
+    //     },
+    //   },
+    //   { session }
+    // );
+
+    await redis.del("parking:transactions_today");
 
     await session.commitTransaction();
     session.endSession();
@@ -360,6 +434,17 @@ const deleteParkingTransaction = async (req, res) => {
       { session }
     );
 
+    await redis.del("parking:transactions_today");
+
+    new SystemActivity({
+      description: `${transaction.billNo} parking cancelled`,
+      activityType: "Cancelled",
+      systemModule: "Parking Transaction",
+      activityBy: req.userId,
+      activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+      userAgent: req.headers["user-agent"],
+    }).save();
+
     await session.commitTransaction();
     session.endSession();
 
@@ -403,6 +488,96 @@ const getFilteredParkingTransactions = async (req, res) => {
   }
 };
 
+const rollbackFromCompleted = async (req, res) => {
+  try {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      const transaction = await ParkingTransaction.findOne({
+        _id: req.body.transactionId,
+        transactionStatus: "Completed",
+      })
+        .populate("vehicle")
+        .session(session);
+
+      // await PaymentMode.updateOne(
+      //   { _id: transaction.paymentMode },
+      //   { $pull: { simRacingTransactions: transaction._id } },
+      //   { session: session }
+      // );
+
+      if (transaction.transactionTime) {
+        const difference = Math.abs(
+          new Date() - new Date(transaction.transactionTime)
+        );
+        const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+        if (
+          days <= 3 &&
+          transaction.vehicle.currentlyAccomodated <
+            transaction.vehicle.totalAccomodationCapacity
+        ) {
+          transaction.transactionStatus = "Parked";
+          transaction.paymentStatus = "Pending";
+          transaction.paymentMode = undefined;
+          transaction.transactionTime = undefined;
+          transaction.end = undefined;
+          transaction.netAmount = undefined;
+          transaction.discountAmount = undefined;
+          transaction.grossAmount = undefined;
+
+          await transaction.save({ session: session });
+
+          await ParkingVehicleType.findByIdAndUpdate(
+            transaction.vehicle._id,
+            {
+              $inc: { currentlyAccomodated: 1 },
+            },
+            { session }
+          );
+
+          // if (!rig) {
+          //   await session.abortTransaction();
+          //   return errorResponse(
+          //     res,
+          //     404,
+          //     `Rollback when ${transaction.rig.rigName} is available`
+          //   );
+          // }
+
+          await redis.del("parking:transactions_today");
+
+          new SystemActivity({
+            description: `${transaction.billNo} rolled back to "Parked"`,
+            activityType: "Rollback",
+            systemModule: "Parking Transaction",
+            activityBy: req.userId,
+            activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+            userAgent: req.headers["user-agent"],
+          }).save();
+
+          await session.commitTransaction();
+          return successResponse(
+            res,
+            200,
+            "Transaction status changed to Active",
+            transaction
+          );
+        }
+      }
+      return errorResponse(res, 400, "Transaction cannot be rolled back");
+    } catch (err) {
+      await session.abortTransaction();
+      console.log(err);
+      return errorResponse(res, 500, "Server error. Failed to rollback");
+    } finally {
+      await session.endSession();
+    }
+  } catch (err) {
+    console.log(err);
+    return errorResponse(res, 500, "Server error. Failed to rollback");
+  }
+};
+
 module.exports = {
   getAvailableVehicles,
   parkingStart,
@@ -411,4 +586,5 @@ module.exports = {
   getParkingTransactions,
   deleteParkingTransaction,
   getFilteredParkingTransactions,
+  rollbackFromCompleted,
 };

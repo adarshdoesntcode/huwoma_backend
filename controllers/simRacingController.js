@@ -384,7 +384,7 @@ const raceStart = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
-    const { rig, customer } = req.body;
+    const { rig, customer, today } = req.body;
 
     const now = new Date();
     const raceStartDateObj = new Date(now);
@@ -462,6 +462,10 @@ const raceStart = async (req, res) => {
 
     await redis.del("simracing:transactions_today");
 
+    if (today) {
+      incrementVisitorCount("simracing", today, 1);
+    }
+
     return successResponse(
       res,
       200,
@@ -484,7 +488,7 @@ const raceStartFromBooking = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
-    const { transactionId, rig, customer } = req.body;
+    const { transactionId, rig, customer, today } = req.body;
 
     const now = new Date();
     const raceStartDateObj = new Date(now);
@@ -568,11 +572,14 @@ const raceStartFromBooking = async (req, res) => {
       },
       { session }
     );
+    await redis.del("simracing:transactions_today");
+    if (today) {
+      incrementVisitorCount("simraicing", today, 1);
+    }
 
     await session.commitTransaction();
     session.endSession();
 
-    await redis.del("simracing:transactions_today");
     return successResponse(
       res,
       200,
@@ -626,7 +633,12 @@ const getCheckoutDetails = async (req, res) => {
         paymentModeOperational: true,
       });
 
-      await redis.set("carwash:payment_modes", JSON.stringify(paymentModes));
+      await redis.set(
+        "carwash:payment_modes",
+        JSON.stringify(paymentModes),
+        "EX",
+        60 * 60 * 24
+      );
     }
 
     return successResponse(
@@ -904,11 +916,11 @@ const rollbackFromCompleted = async (req, res) => {
         .populate("rig")
         .session(session);
 
-      await PaymentMode.updateOne(
-        { _id: transaction.paymentMode },
-        { $pull: { simRacingTransactions: transaction._id } },
-        { session: session }
-      );
+      // await PaymentMode.updateOne(
+      //   { _id: transaction.paymentMode },
+      //   { $pull: { simRacingTransactions: transaction._id } },
+      //   { session: session }
+      // );
 
       if (transaction.transactionTime) {
         const difference = Math.abs(
@@ -1071,7 +1083,7 @@ const clientStartRace = async (req, res) => {
 
 const startRaceFromClient = async (req, res) => {
   try {
-    const { customerName, customerContact, rigId } = req.body;
+    const { customerName, customerContact, rigId, today } = req.body;
     const session = await mongoose.startSession();
     session.startTransaction();
     try {
@@ -1165,6 +1177,10 @@ const startRaceFromClient = async (req, res) => {
       );
 
       await redis.del("simracing:transactions_today");
+
+      if (today) {
+        incrementVisitorCount("simracing", today, 1);
+      }
 
       new SystemActivity({
         description: `Race Started by (${customerName})`,

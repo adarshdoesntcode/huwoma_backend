@@ -34,6 +34,13 @@ router
   );
 
 router
+  .route("/transaction/rollback")
+  .post(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    parkingController.rollbackFromCompleted
+  );
+
+router
   .route("/transaction/:transactionId")
   .delete(
     verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),

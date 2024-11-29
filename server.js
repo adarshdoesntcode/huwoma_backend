@@ -9,9 +9,12 @@ const mongoose = require("mongoose");
 const corsOptions = require("./config/corsOptions");
 const verifyJWT = require("./middleware/verifyJWT");
 const credentials = require("./middleware/credentials");
+const ROLES_LIST = require("./config/roleList");
 
 const verifyPOSAccessToken = require("./middleware/verifyPOSAccessToken");
 const { connectDB, connectRedis } = require("./config/dbConn");
+const verifyRoles = require("./middleware/verifyRoles");
+const { getDashboardData } = require("./controllers/dashboardController");
 
 const PORT = process.env.PORT || 3500;
 app.set("trust proxy", true);
@@ -41,6 +44,12 @@ app.use("/api/settings", verifyJWT, require("./routes/settings"));
 app.use("/api/carwash", verifyJWT, require("./routes/carwash"));
 app.use("/api/parking", verifyJWT, require("./routes/parking"));
 app.use("/api/systemactivity", verifyJWT, require("./routes/system-activity"));
+app.use(
+  "/api/dashboard",
+  verifyJWT,
+  verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+  getDashboardData
+);
 
 if (process.env.NODE_ENV !== "production") {
   const PORT = process.env.PORT || 5000;
