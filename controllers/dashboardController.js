@@ -238,6 +238,9 @@ const getDashboardData = async (req, res) => {
           total: {
             $sum: "$netAmount",
           },
+          count: {
+            $sum: 1,
+          },
         },
       },
     ]);
@@ -256,6 +259,9 @@ const getDashboardData = async (req, res) => {
           _id: null,
           total: {
             $sum: "$netAmount",
+          },
+          count: {
+            $sum: 1,
           },
         },
       },
@@ -276,12 +282,16 @@ const getDashboardData = async (req, res) => {
           total: {
             $sum: "$netAmount",
           },
+          count: {
+            $sum: 1,
+          },
         },
       },
     ]);
 
     const carwashYesterdayTotal =
       carwashYesterday.length > 0 ? carwashYesterday[0].total : 0;
+
     const simracingYesterdayTotal =
       simracingYesterday.length > 0 ? simracingYesterday[0].total : 0;
     const parkingYesterdayTotal =
@@ -297,9 +307,18 @@ const getDashboardData = async (req, res) => {
       parkingTransactions,
       activePaymentModes,
       yesterday: {
-        carwash: carwashYesterdayTotal,
-        simracing: simracingYesterdayTotal,
-        parking: parkingYesterdayTotal,
+        carwash: {
+          total: carwashYesterdayTotal,
+          count: carwashYesterday[0]?.count || 0,
+        },
+        simracing: {
+          total: simracingYesterdayTotal,
+          count: simracingYesterday[0]?.count || 0,
+        },
+        parking: {
+          total: parkingYesterdayTotal,
+          count: parkingYesterday[0]?.count || 0,
+        },
       },
       counts: {
         carwash: carwashCounts,
