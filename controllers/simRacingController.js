@@ -10,6 +10,7 @@ const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 const SystemActivity = require("../models/SystemActivity");
 const redis = require("../config/redisConn");
+const { incrementVisitorCount } = require("./utils/redisUtils");
 
 // ======================CUSTOMER=============================
 
