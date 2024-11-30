@@ -54,4 +54,11 @@ const ParkingTransactionSchema = new Schema(
   }
 );
 
+ParkingTransactionSchema.index({ createdAt: 1, transactionTime: 1 });
+ParkingTransactionSchema.index({ transactionStatus: 1 });
+ParkingTransactionSchema.index({ paymentStatus: 1 });
+ParkingTransactionSchema.index({ createdAt: -1 });
+ParkingTransactionSchema.index({ vehicle: 1 });
+ParkingTransactionSchema.index({ paymentMode: 1 });
+
 module.exports = mongoose.model("ParkingTransaction", ParkingTransactionSchema);

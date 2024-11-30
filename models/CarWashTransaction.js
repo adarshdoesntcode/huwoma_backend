@@ -113,11 +113,16 @@ const CarWashTransactionSchema = new Schema(
   }
 );
 CarWashTransactionSchema.index({ deleteAt: 1 }, { expireAfterSeconds: 0 });
-CarWashTransactionSchema.index({
-  createdAt: 1,
-  transactionTime: 1,
-});
-CarWashTransactionSchema.index({ transactionStatus: 1 });
-CarWashTransactionSchema.index({ paymentStatus: 1 });
+CarWashTransactionSchema.index({ createdAt: 1, transactionTime: 1 });
+CarWashTransactionSchema.index({ transactionStatus: 1, paymentStatus: 1 });
+CarWashTransactionSchema.index(
+  { transactionStatus: 1, paymentStatus: 1, redeemed: 1 },
+  { sparse: true }
+);
+CarWashTransactionSchema.index({ "service.id": 1 });
+CarWashTransactionSchema.index({ serviceVehicle: 1 });
+CarWashTransactionSchema.index({ customer: 1 });
+CarWashTransactionSchema.index({ paymentMode: 1 });
+CarWashTransactionSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model("CarWashTransaction", CarWashTransactionSchema);

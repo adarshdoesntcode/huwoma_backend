@@ -217,6 +217,7 @@ const getDashboardData = async (req, res) => {
       yesterday.getMonth(),
       yesterday.getDate()
     );
+
     const endOfYesterday = new Date(
       yesterday.getFullYear(),
       yesterday.getMonth(),

@@ -53,4 +53,6 @@ const SystemActivitySchema = new Schema(
   }
 );
 
+SystemActivitySchema.index({ activityDate: 1 });
+
 module.exports = mongoose.model("SystemActivity", SystemActivitySchema);

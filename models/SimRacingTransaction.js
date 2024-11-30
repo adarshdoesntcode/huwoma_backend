@@ -67,6 +67,13 @@ const SimRacingTransactionSchema = new Schema(
   }
 );
 SimRacingTransactionSchema.index({ deleteAt: 1 }, { expireAfterSeconds: 0 });
+SimRacingTransactionSchema.index({ createdAt: 1, transactionTime: 1, end: 1 });
+SimRacingTransactionSchema.index({ transactionStatus: 1 });
+SimRacingTransactionSchema.index({ paymentStatus: 1 });
+SimRacingTransactionSchema.index({ createdAt: -1 });
+SimRacingTransactionSchema.index({ customer: 1 });
+SimRacingTransactionSchema.index({ rig: 1 });
+SimRacingTransactionSchema.index({ paymentMode: 1 });
 
 module.exports = mongoose.model(
   "SimRacingTransaction",
