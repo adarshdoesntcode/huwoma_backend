@@ -231,6 +231,11 @@ const getDashboardData = async (req, res) => {
             $gte: startOfYesterday,
             $lt: endOfYesterday,
           },
+          transactionStatus: {
+            $not: {
+              $in: ["Cancelled", "Booked"],
+            },
+          },
         },
       },
       {
@@ -253,6 +258,11 @@ const getDashboardData = async (req, res) => {
             $gte: startOfYesterday,
             $lt: endOfYesterday,
           },
+          transactionStatus: {
+            $not: {
+              $in: ["Cancelled", "Booked"],
+            },
+          },
         },
       },
       {
@@ -274,6 +284,11 @@ const getDashboardData = async (req, res) => {
           createdAt: {
             $gte: startOfYesterday,
             $lt: endOfYesterday,
+          },
+          transactionStatus: {
+            $not: {
+              $in: ["Cancelled"],
+            },
           },
         },
       },

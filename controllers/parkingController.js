@@ -4,7 +4,10 @@ const ParkingVehicleType = require("../models/ParkingVehicleType");
 const PaymentMode = require("../models/PaymentMode");
 const { successResponse, errorResponse } = require("./utils/reponse");
 const { generateParkingBillNo } = require("./utils/utils");
-const { incrementVisitorCount } = require("./utils/redisUtils");
+const {
+  incrementVisitorCount,
+  decrementVisitorCount,
+} = require("./utils/redisUtils");
 const redis = require("../config/redisConn");
 const SystemActivity = require("../models/SystemActivity");
 
@@ -435,6 +438,11 @@ const deleteParkingTransaction = async (req, res) => {
     );
 
     await redis.del("parking:transactions_today");
+    decrementVisitorCount(
+      "parking",
+      transaction.createdAt.toISOString().slice(0, 10),
+      1
+    );
 
     new SystemActivity({
       description: `${transaction.billNo} parking cancelled`,

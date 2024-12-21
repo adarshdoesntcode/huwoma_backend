@@ -10,7 +10,10 @@ const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 const SystemActivity = require("../models/SystemActivity");
 const redis = require("../config/redisConn");
-const { incrementVisitorCount } = require("./utils/redisUtils");
+const {
+  incrementVisitorCount,
+  decrementVisitorCount,
+} = require("./utils/redisUtils");
 
 // ======================CUSTOMER=============================
 
@@ -788,6 +791,12 @@ const cancelRace = async (req, res) => {
     );
 
     await redis.del("simracing:transactions_today");
+
+    decrementVisitorCount(
+      "simracing",
+      transaction.createdAt.toISOString().slice(0, 10),
+      1
+    );
 
     new SystemActivity({
       description: `${transaction.billNo} race cancelled`,

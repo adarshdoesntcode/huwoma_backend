@@ -12,6 +12,17 @@ async function incrementVisitorCount(service, date, incrementBy = 1) {
 }
 
 /**
+ * Decrement visitor count for a specific service and date.
+ * @param {string} service - The service name (e.g., "carwash", "simracing", "parking").
+ * @param {string} date - The date string in `YYYY-MM-DD` format.
+ * @param {number} decrementBy - The number to decrement by (default: 1).
+ */
+async function decrementVisitorCount(service, date, decrementBy = 1) {
+  const key = `visitor_count:${service}`; // Generate the Redis hash key
+  await redis.hincrby(key, date, -decrementBy); // Decrement the count for the given date
+}
+
+/**
  * Get visitor counts for a specific service.
  * @param {string} service - The service name (e.g., "carwash", "simracing", "parking").
  * @returns {Promise<Object>} - A key-value object where keys are dates and values are counts.
@@ -29,4 +40,5 @@ async function getVisitorCounts(service) {
 module.exports = {
   incrementVisitorCount,
   getVisitorCounts,
+  decrementVisitorCount,
 };

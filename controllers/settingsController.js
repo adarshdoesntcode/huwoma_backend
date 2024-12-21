@@ -6,7 +6,7 @@ const Configuration = require("../models/Configuration");
 const InspectionTemplate = require("../models/InspectionTemplate");
 
 const { errorResponse, successResponse } = require("./utils/reponse");
-
+const mongoose = require("mongoose");
 const POSAccess = require("../models/POSAccess");
 const SimRacingRig = require("../models/SimRacingRig");
 const ParkingVehicleType = require("../models/ParkingVehicleType");

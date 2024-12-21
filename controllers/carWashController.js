@@ -6,7 +6,10 @@ const InspectionTemplate = require("../models/InspectionTemplate");
 const PaymentMode = require("../models/PaymentMode");
 const ServiceType = require("../models/ServiceType");
 const SystemActivity = require("../models/SystemActivity");
-const { incrementVisitorCount } = require("./utils/redisUtils");
+const {
+  incrementVisitorCount,
+  decrementVisitorCount,
+} = require("./utils/redisUtils");
 const { errorResponse, successResponse } = require("./utils/reponse");
 const { generateBillNo } = require("./utils/utils");
 const mongoose = require("mongoose");
@@ -955,6 +958,12 @@ const deleteTransaction = async (req, res) => {
     }).save();
 
     await redis.del("carwash:transactions_today");
+
+    decrementVisitorCount(
+      "carwash",
+      transaction.createdAt.toISOString().slice(0, 10),
+      1
+    );
 
     return successResponse(
       res,
