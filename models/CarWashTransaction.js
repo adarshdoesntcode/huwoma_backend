@@ -92,6 +92,15 @@ const CarWashTransactionSchema = new Schema(
         ],
       },
     ],
+    addOns: [
+      {
+        name: { type: String, required: true },
+        price: {
+          type: Number,
+          min: 0,
+        },
+      },
+    ],
     grossAmount: {
       type: Number,
       min: 0,
