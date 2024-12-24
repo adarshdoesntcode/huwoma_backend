@@ -430,114 +430,6 @@ const deleteServiceType = async (req, res) => {
   }
 };
 
-//====================PACKAGE TYPE======================
-
-// const createPackageType = async (req, res) => {
-//   try {
-//     const {
-//       packageTypeName,
-//       packageContents,
-//       billAbbreviation,
-//       packageRate,
-//       includeParking,
-//       streakApplicable,
-//       vehicleTypeId,
-//     } = req.body;
-
-//     const vehicleType = await CarWashVehicleType.findById(vehicleTypeId);
-//     if (!vehicleType) {
-//       return res.status(404).json({ error: "Vehicle not found" });
-//     }
-
-//     const newPackageType = new PackageType({
-//       packageTypeName,
-//       packageContents,
-//       billAbbreviation,
-//       packageRate,
-//       includeParking,
-//       streakApplicable,
-//       packageVehicle: vehicleTypeId,
-//     });
-
-//     const savedService = await newPackageType.save();
-
-//     vehicleType.packages.push(newPackageType._id);
-//     await vehicleType.save();
-
-//     res.status(201).json({
-//       message: "Package type created successfully",
-//       data: savedService,
-//     });
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ error: "Server error" });
-//   }
-// };
-
-// const getAllPackageType = async (req, res) => {
-//   try {
-//     const activePackageTypes = await PackageType.find({
-//       packageTypeOperational: true,
-//     });
-//     if (activePackageTypes.length === 0) {
-//       return res.status(204).send();
-//     }
-
-//     res.status(200).json(activePackageTypes);
-//   } catch (err) {
-//     console.error(err);
-
-//     res.status(500).json({ error: "Server error" });
-//   }
-// };
-
-// const updatePackageType = async (req, res) => {
-//   const { packageTypeId, updates } = req.body;
-
-//   try {
-//     const updatedPackageType = await PackageType.findOneAndUpdate(
-//       { _id: packageTypeId, packageTypeOperational: true },
-//       updates,
-//       { new: true, runValidators: true }
-//     );
-
-//     if (!updatedPackageType) {
-//       return res.status(404).json({ error: "Package Type not found" });
-//     }
-
-//     res.status(200).json(updatedPackageType);
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ error: "Server error" });
-//   }
-// };
-
-// const deletePackageType = async (req, res) => {
-//   const { packageTypeId } = req.body;
-
-//   try {
-//     const packageType = await PackageType.findOneAndUpdate(
-//       { _id: packageTypeId, packageTypeOperational: true },
-//       {
-//         packageTypeOperational: false,
-//       },
-//       { new: true, runValidators: true }
-//     );
-
-//     if (!packageType) {
-//       return res.status(404).json({ error: "Package Type not found" });
-//     }
-
-//     res.status(200).json({
-//       message: "Service Type soft deleted successfully",
-//       data: packageType,
-//     });
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ error: "Server error" });
-//   }
-// };
-
 //====================INSPECTION======================
 
 const createInspectionTemplate = async (req, res) => {
@@ -646,34 +538,6 @@ const getInspectionTemplate = async (req, res) => {
   }
 };
 
-// const updateInspectionTemplate = async (req, res) => {
-//   try {
-//     const { templateId, categories } = req.body;
-
-//     const updatedTemplate = await InspectionTemplate.findByIdAndUpdate(
-//       templateId,
-//       { categories },
-//       { new: true }
-//     );
-
-//     if (!updatedTemplate) {
-//       return errorResponse(res, 404, "Inspection template not found");
-//     }
-
-//     await redis.set("carwash:inspection", JSON.stringify(updatedTemplate));
-
-//     return successResponse(
-//       res,
-//       200,
-//       "Inspection template updated successfully",
-//       updatedTemplate
-//     );
-//   } catch (error) {
-//     console.error(error);
-//     return errorResponse(res, 500, "Server error", error.message);
-//   }
-// };
-
 //====================SIM RACING======================
 
 const createNewSimRacingRig = async (req, res) => {
@@ -691,6 +555,7 @@ const createNewSimRacingRig = async (req, res) => {
     const savedRig = await newRig.save();
 
     await redis.del("simracing:rig");
+    await redis.del("simracing:transactions_today");
 
     new SystemActivity({
       description: `${savedRig.rigName} created.`,
@@ -732,6 +597,7 @@ const updateSimRacingRig = async (req, res) => {
     }
 
     await redis.del("simracing:rig");
+    await redis.del("simracing:transactions_today");
 
     new SystemActivity({
       description: `${updatedRig.rigName} updated.`,
@@ -783,6 +649,7 @@ const deleteSimRacingRig = async (req, res) => {
     }
 
     await redis.del("simracing:rig");
+    await redis.del("simracing:transactions_today");
 
     new SystemActivity({
       description: `${rig.rigName} deleted.`,
@@ -858,6 +725,7 @@ const updateSimRacingCoordinates = async (req, res) => {
       }
     );
     await redis.del("simracing:coordinates");
+    await redis.del("simracing:transactions_today");
 
     new SystemActivity({
       description: `Sim racing coordinates updated.`,
@@ -980,6 +848,7 @@ const createParkingVehicleType = async (req, res) => {
     const savedParkingVehicleType = await newParkingVehicleType.save();
 
     await redis.del("parking:vehicles");
+    await redis.del("parking:transactions_today");
 
     new SystemActivity({
       description: `${savedParkingVehicleType.vehicleTypeName} created.`,
@@ -1017,6 +886,7 @@ const updateParkingVehicleType = async (req, res) => {
     }
 
     await redis.del("parking:vehicles");
+    await redis.del("parking:transactions_today");
 
     new SystemActivity({
       description: `${updatedParkingVehicleType.vehicleTypeName} updated.`,
@@ -1054,6 +924,7 @@ const deleteParkingVehicleType = async (req, res) => {
     }
 
     await redis.del("parking:vehicles");
+    await redis.del("parking:transactions_today");
 
     new SystemActivity({
       description: `${vehicleType.vehicleTypeName} deleted.`,
@@ -1094,6 +965,9 @@ const createPaymentMode = async (req, res) => {
     const savedPaymentMode = await newPaymentMode.save();
 
     await redis.del("payment:all");
+    await redis.del("carwash:transactions_today");
+    await redis.del("simracing:transactions_today");
+    await redis.del("parking:transactions_today");
 
     return successResponse(
       res,
@@ -1158,6 +1032,9 @@ const updatePaymentMode = async (req, res) => {
     }
 
     await redis.del("payment:all");
+    await redis.del("carwash:transactions_today");
+    await redis.del("simracing:transactions_today");
+    await redis.del("parking:transactions_today");
 
     return successResponse(
       res,
@@ -1186,6 +1063,9 @@ const deletePaymentMode = async (req, res) => {
     }
 
     await redis.del("payment:all");
+    await redis.del("carwash:transactions_today");
+    await redis.del("simracing:transactions_today");
+    await redis.del("parking:transactions_today");
 
     return successResponse(
       res,

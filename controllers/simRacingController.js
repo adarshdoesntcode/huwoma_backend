@@ -168,6 +168,7 @@ const updateSimracingCustomer = async (req, res) => {
     if (!customer) {
       return errorResponse(res, 404, "Customer not found");
     }
+    await redis.del("simracing:transactions_today");
 
     new SystemActivity({
       description: `${customer.customerName}'s details updated.`,
