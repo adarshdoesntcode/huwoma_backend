@@ -184,6 +184,8 @@ const updateCarwashCustomer = async (req, res) => {
       return errorResponse(res, 404, "Customer not found");
     }
 
+    await redis.del("carwash:transactions_today");
+
     new SystemActivity({
       description: `${customer.customerName}'s details updated.`,
       activityType: "Update",

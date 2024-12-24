@@ -31,6 +31,7 @@ const createVehicleType = async (req, res) => {
 
     const savedVehicleType = await newVehicleType.save();
     await redis.del("carwash:vehicles");
+    await redis.del("carwash:transactions_today");
 
     new SystemActivity({
       description: `${vehicleTypeName} created.`,
@@ -129,6 +130,7 @@ const updateVehicleType = async (req, res) => {
     }
 
     await redis.del("carwash:vehicles");
+    await redis.del("carwash:transactions_today");
 
     new SystemActivity({
       description: `${updatedVehicleType.vehicleTypeName} updated.`,
@@ -171,6 +173,7 @@ const deleteVehicleType = async (req, res) => {
     );
 
     await redis.del("carwash:vehicles");
+    await redis.del("carwash:transactions_today");
 
     new SystemActivity({
       description: `${vehicleType.vehicleTypeName} and its services deleted.`,
@@ -235,6 +238,7 @@ const createServiceType = async (req, res) => {
     await session.endSession();
 
     await redis.del("carwash:vehicles");
+    await redis.del("carwash:transactions_today");
 
     new SystemActivity({
       description: `${vehicleType.vehicleTypeName}'s services created.`,
@@ -364,6 +368,7 @@ const updateServiceType = async (req, res) => {
     await vehicleType.save();
 
     await redis.del("carwash:vehicles");
+    await redis.del("carwash:transactions_today");
 
     new SystemActivity({
       description: `${vehicleType.vehicleTypeName}'s services updated.`,
@@ -404,6 +409,7 @@ const deleteServiceType = async (req, res) => {
       return res.status(404).json({ error: "Service Type not found" });
     }
     await redis.del("carwash:vehicles");
+    await redis.del("carwash:transactions_today");
 
     new SystemActivity({
       description: `${serviceType.serviceTypeName}' deleted.`,
@@ -584,6 +590,8 @@ const createInspectionTemplate = async (req, res) => {
       "EX",
       60 * 60 * 24
     );
+
+    await redis.del("carwash:transactions_today");
 
     return successResponse(res, 200, "Inspections processed successfully", {
       ...updatedInspections,
