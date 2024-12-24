@@ -52,6 +52,17 @@ router
   );
 
 router
+  .route("/transaction/edit")
+  .get(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    carWashController.getPreEditTransactionData
+  )
+  .put(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    carWashController.editCarwashTransaction
+  );
+
+router
   .route("/transaction/:id")
   .get(
     verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),

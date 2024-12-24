@@ -1220,6 +1220,96 @@ const rollbackFromCompleted = async (req, res) => {
   }
 };
 
+const getPreEditTransactionData = async (req, res) => {
+  try {
+    const vehicleTypes = await CarWashVehicleType.find({
+      vehicleTypeOperational: true,
+    }).populate({
+      path: "services",
+      match: {
+        serviceTypeOperational: true,
+      },
+    });
+
+    const paymentModes = await PaymentMode.find({
+      paymentModeOperational: true,
+    });
+
+    return successResponse(res, 200, "Success", {
+      vehicleTypes,
+      paymentModes,
+    });
+  } catch (err) {
+    return errorResponse(res, 500, "Server error. Failed to get transaction");
+  }
+};
+
+const editCarwashTransaction = async (req, res) => {
+  const { transactionId, serviceId, vehicleNumber, paymentMode } = req.body;
+  let transaction;
+  try {
+    if (paymentMode) {
+      const paymentModeObj = await PaymentMode.findById(paymentMode);
+      if (!paymentModeObj) {
+        return errorResponse(res, 404, "Payment mode not found");
+      }
+
+      transaction = await CarWashTransaction.findOneAndUpdate(
+        {
+          _id: transactionId,
+          transactionStatus: { $in: ["Completed"] },
+        },
+        {
+          paymentMode,
+          vehicleNumber,
+        },
+        { new: true }
+      );
+      if (!transaction) {
+        return errorResponse(res, 404, "Transaction not found");
+      }
+    } else {
+      const service = await ServiceType.findById(serviceId);
+      if (!service) {
+        return errorResponse(res, 404, "Service not found");
+      }
+
+      transaction = await CarWashTransaction.findOneAndUpdate(
+        {
+          _id: transactionId,
+          transactionStatus: { $in: ["In Queue", "Ready for Pickup"] },
+        },
+        {
+          "service.id": serviceId,
+          "service.cost": service.serviceRate,
+          "service.actualRate": service.serviceRate,
+          vehicleNumber,
+        },
+        { new: true }
+      );
+      if (!transaction) {
+        return errorResponse(res, 404, "Transaction not found");
+      }
+    }
+
+    await redis.del("carwash:transactions_today");
+
+    new SystemActivity({
+      description: `${transaction.billNo} edited.`,
+      activityType: "Update",
+      systemModule: "Carwash Transaction",
+      activityBy: req.userId,
+      activityIpAddress: req.headers["x-forwarded-for"] || req.ip,
+      userAgent: req.headers["user-agent"],
+    }).save();
+
+    return successResponse(res, 200, "Transaction updated", transaction);
+  } catch (err) {
+    console.log(err);
+    return errorResponse(res, 500, "Server error");
+  }
+};
+
 module.exports = {
   getAllCustomers,
   createCustomer,
@@ -1239,4 +1329,6 @@ module.exports = {
   updateCarwashCustomer,
   rollbackFromPickup,
   rollbackFromCompleted,
+  editCarwashTransaction,
+  getPreEditTransactionData,
 };
