@@ -116,6 +116,13 @@ const CarWashTransactionSchema = new Schema(
     vehicleNumber: {
       type: String,
     },
+    vehicleColor: {
+      colorName: String,
+      colorCode: String,
+    },
+    vehicleModel: {
+      type: String,
+    },
   },
   {
     timestamps: true,

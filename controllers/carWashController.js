@@ -384,6 +384,8 @@ const transactionStartFromBooking = async (req, res) => {
       transactionId,
       service,
       vehicleNumber,
+      vehicleModel,
+      vehicleColor,
       customer,
       // serviceStart,
       serviceRate,
@@ -453,6 +455,8 @@ const transactionStartFromBooking = async (req, res) => {
         },
         $unset: { deleteAt: "" },
         vehicleNumber: vehicleNumber,
+        vehicleModel: vehicleModel,
+        vehicleColor: vehicleColor,
       },
       {
         new: true,
@@ -464,10 +468,8 @@ const transactionStartFromBooking = async (req, res) => {
     }
 
     existingCustomer.customerTransactions.push(transaction._id);
-    // existingService.serviceTransactions.push(transaction._id);
 
     await existingCustomer.save({ session });
-    // await existingService.save({ session });
 
     await redis.del("carwash:transactions_today");
     redis.hincrby("carwash_hourly_count", hour, 1);
@@ -504,6 +506,8 @@ const transactionOne = async (req, res) => {
     const {
       service,
       vehicleNumber,
+      vehicleColor,
+      vehicleModel,
       customer,
       actualRate,
       serviceRate,
@@ -581,6 +585,8 @@ const transactionOne = async (req, res) => {
       },
       billNo,
       vehicleNumber: vehicleNumber,
+      vehicleModel: vehicleModel,
+      vehicleColor: vehicleColor,
     });
 
     const savedTransaction = await newTransaction.save({ session });
@@ -1247,7 +1253,8 @@ const getPreEditTransactionData = async (req, res) => {
 };
 
 const editCarwashTransaction = async (req, res) => {
-  const { transactionId, serviceId, vehicleNumber, paymentMode } = req.body;
+  const { transactionId, serviceId, vehicleNumber, vehicleModel, paymentMode } =
+    req.body;
   let transaction;
   try {
     if (paymentMode) {
@@ -1264,6 +1271,7 @@ const editCarwashTransaction = async (req, res) => {
         {
           paymentMode,
           vehicleNumber,
+          vehicleModel,
         },
         { new: true }
       );
@@ -1286,6 +1294,7 @@ const editCarwashTransaction = async (req, res) => {
           "service.cost": service.serviceRate,
           "service.actualRate": service.serviceRate,
           vehicleNumber,
+          vehicleModel,
         },
         { new: true }
       );
