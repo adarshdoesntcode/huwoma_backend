@@ -12,7 +12,11 @@ const credentials = require("./middleware/credentials");
 const ROLES_LIST = require("./config/roleList");
 
 const verifyPOSAccessToken = require("./middleware/verifyPOSAccessToken");
-const { connectDB, connectRedis } = require("./config/dbConn");
+const {
+  connectDB,
+  connectRedis,
+  connectRedisMiddleware,
+} = require("./config/dbConn");
 const verifyRoles = require("./middleware/verifyRoles");
 const { getDashboardData } = require("./controllers/dashboardController");
 
@@ -23,11 +27,13 @@ app.use(cors(corsOptions));
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 app.use(cookieParser());
+app.use(connectRedisMiddleware);
 
 connectDB(5);
-connectRedis();
+// connectRedis();
 
 // Define routes
+
 app.use("/", require("./routes/api"));
 
 app.use("/api/startrace", require("./routes/client-sim-racing"));

@@ -1,4 +1,3 @@
-const { Redis } = require("@upstash/redis");
 const mongoose = require("mongoose");
 const redis = require("./redisConn");
 
@@ -28,13 +27,28 @@ const connectDB = async (retries = 5) => {
   connectWithRetry();
 };
 
-const connectRedis = async () => {
+const connectRedisMiddleware = async (req, res, next) => {
   try {
-    await redis.ping();
-    console.log("Redis Connected ✅");
+    if (redis.isConnected) {
+      return next();
+    }
+    await connectRedis();
+    next();
   } catch (error) {
     console.error(`Redis connection error: ${error.message}`);
+    next(error);
   }
 };
 
-module.exports = { connectRedis, connectDB };
+const connectRedis = async () => {
+  try {
+    await redis.ping();
+    redis.isConnected = true;
+    console.log("Redis Connected ✅");
+  } catch (error) {
+    console.error(`Redis connection error: ${error.message}`);
+    redis.isConnected = false;
+  }
+};
+
+module.exports = { connectRedis, connectDB, connectRedisMiddleware };
