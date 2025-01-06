@@ -12,6 +12,7 @@ const { sendEmail } = require("./mailController");
 const roleList = require("../config/roleList");
 const SystemActivity = require("../models/SystemActivity");
 const redis = require("../config/redisConn");
+const { connectRedis } = require("../config/dbConn");
 
 const handleNewAdmin = async (req, res) => {
   const { fullname, email, phoneNumber, role, confirmPassword, password } =
@@ -362,6 +363,10 @@ const handleRefreshToken = async (req, res) => {
 
     const refreshToken = cookies.jwt;
     // check for user found or not
+    if (!redis.isConnected) {
+      await connectRedis();
+    }
+
     const cachedUser = await redis.get(`refresh:${refreshToken}`);
 
     // if (!user) {
