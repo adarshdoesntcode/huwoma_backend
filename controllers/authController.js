@@ -363,7 +363,8 @@ const handleRefreshToken = async (req, res) => {
 
     const refreshToken = cookies.jwt;
     // check for user found or not
-    if (!redis.isConnected) {
+
+    if (!redis.status === "ready") {
       await connectRedis();
     }
 

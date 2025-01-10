@@ -773,7 +773,8 @@ const transactionThree = async (req, res) => {
     // );
 
     if (redeemed && washCount) {
-      await CarWashTransaction.updateMany(
+      console.log("🚀 ~ transactionThree ~ washCount:", washCount);
+      const transactionsToUpdate = await CarWashTransaction.find(
         {
           customer: transaction.customer,
           paymentStatus: "Paid",
@@ -781,18 +782,24 @@ const transactionThree = async (req, res) => {
           "service.id": serviceId,
           redeemed: false,
         },
+        null, // No projection
         {
-          $set: {
-            redeemed: true,
-          },
-        },
-        {
-          sort: {
-            createdAt: 1,
-          },
-          limit: washCount,
-          session,
+          sort: { createdAt: 1 }, // Sort by `createdAt` ascending
+          limit: washCount, // Limit the number of documents
+          session, // Include session for atomicity
         }
+      );
+
+      // Extract the IDs of the transactions
+      const transactionIds = transactionsToUpdate.map((doc) => doc._id);
+
+      // Update only the limited documents
+      await CarWashTransaction.updateMany(
+        { _id: { $in: transactionIds } },
+        {
+          $set: { redeemed: true },
+        },
+        { session }
       );
     }
 
@@ -1169,7 +1176,7 @@ const rollbackFromCompleted = async (req, res) => {
           ) {
             transaction.redeemed = false;
 
-            await CarWashTransaction.updateMany(
+            const transactionsToReset = await CarWashTransaction.find(
               {
                 customer: transaction.customer,
                 paymentStatus: "Paid",
@@ -1177,18 +1184,26 @@ const rollbackFromCompleted = async (req, res) => {
                 "service.id": transaction.service.id._id,
                 redeemed: true,
               },
+              null, // No projection
               {
-                $set: {
-                  redeemed: false,
-                },
-              },
-              {
-                sort: {
-                  createdAt: 1,
-                },
-                limit: transaction.service.id.streakApplicable.washCount,
-                session: session,
+                sort: { createdAt: 1 }, // Sort by `createdAt` in ascending order
+                limit: transaction.service.id.streakApplicable.washCount, // Limit to the required wash count
+                session, // Include the session for atomicity
               }
+            );
+
+            // Step 2: Extract the IDs of the transactions to reset
+            const resetTransactionIds = transactionsToReset.map(
+              (doc) => doc._id
+            );
+
+            // Step 3: Update only the selected documents
+            await CarWashTransaction.updateMany(
+              { _id: { $in: resetTransactionIds } },
+              {
+                $set: { redeemed: false }, // Reset `redeemed` field to `false`
+              },
+              { session } // Use the same session
             );
           }
 
