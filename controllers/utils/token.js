@@ -37,10 +37,9 @@ const createRefreshToken = (foundUser, expirationTime) => {
 const setCookie = (res, refreshToken) => {
   res.cookie("jwt", refreshToken, {
     httpOnly: true,
-    sameSite: "None",
+    sameSite: "Strict",
     secure: true,
-    maxAge: 24 * 60 * 60 * 1000,
-    // domain: "project-phoenix-omega.vercel.app", using coleascing operator TODO
+    maxAge: 30 * 24 * 60 * 60 * 1000,
   });
 };
 
