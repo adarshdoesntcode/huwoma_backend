@@ -39,7 +39,7 @@ const setCookie = (res, refreshToken) => {
     httpOnly: true,
     sameSite: "Strict",
     secure: true,
-    maxAge: 30 * 24 * 60 * 60 * 1000,
+    maxAge: 31 * 24 * 60 * 60 * 1000,
   });
 };
 
