@@ -54,20 +54,87 @@ const createCustomer = async (req, res) => {
 
 const findCustomer = async (req, res) => {
   try {
-    const { customerContact } = req.body;
+    const { customerContact, vehicleNumber, customerName } = req.body;
 
-    const customer = await CarWashCustomer.findOne({
-      customerContact,
-    }).populate({
-      path: "customerTransactions",
-      match: {
-        transactionStatus: "Completed",
-        paymentStatus: "Paid",
-        redeemed: false,
-      },
-    });
+    let customer;
+
+    if (customerContact && !vehicleNumber && !customerName) {
+      customer = await CarWashCustomer.findOne({
+        customerContact,
+      }).populate({
+        path: "customerTransactions",
+        match: {
+          transactionStatus: "Completed",
+          paymentStatus: "Paid",
+          redeemed: false,
+        },
+      });
+    }
+
+    if (!customerContact && !vehicleNumber && customerName) {
+      customer = await CarWashCustomer.find({
+        customerName: { $regex: new RegExp(customerName, "i") },
+      }).populate({
+        path: "customerTransactions",
+        match: {
+          transactionStatus: "Completed",
+          paymentStatus: "Paid",
+          redeemed: false,
+        },
+      });
+    }
+
+    if (!customerContact && vehicleNumber && !customerName) {
+      const customersWithModels = await CarWashTransaction.aggregate([
+        {
+          $match: {
+            vehicleNumber: { $regex: new RegExp(vehicleNumber, "i") },
+          },
+        },
+        {
+          $group: {
+            _id: "$customer",
+            models: {
+              $addToSet: {
+                model: "$vehicleModel",
+                vehicleNumber: "$vehicleNumber",
+                vehicleColor: "$vehicleColor",
+              },
+            },
+          },
+        },
+      ]);
+
+      const customers = customersWithModels.map((customer) => customer._id);
+
+      customer = await CarWashCustomer.find({
+        _id: { $in: customers },
+      }).populate({
+        path: "customerTransactions",
+        match: {
+          transactionStatus: "Completed",
+          paymentStatus: "Paid",
+          redeemed: false,
+        },
+      });
+
+      customer = customer.map((customer) => {
+        const customerWithModels = customersWithModels.find(
+          (customerWithModel) =>
+            customerWithModel._id.toString() === customer._id.toString()
+        );
+
+        return {
+          ...customer._doc,
+          vehicleModels: customerWithModels ? customerWithModels.models : [],
+        };
+      });
+    }
 
     if (!customer) {
+      return errorResponse(res, 404, "Customer not found");
+    }
+    if (customer.length === 0) {
       return errorResponse(res, 404, "Customer not found");
     }
 
@@ -78,6 +145,7 @@ const findCustomer = async (req, res) => {
       customer
     );
   } catch (error) {
+    console.log("🚀 ~ findCustomer ~ error:", error);
     return errorResponse(res, 500, "Server error", error.message);
   }
 };
