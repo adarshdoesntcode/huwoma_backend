@@ -269,6 +269,32 @@ const updateCarwashCustomer = async (req, res) => {
   }
 };
 
+const resetCustomerStreak = async (req, res) => {
+  try {
+    const { customerId, serviceId } = req.body;
+
+    if (!customerId || !serviceId) {
+      return errorResponse(res, 400, "customerId and serviceId are required.");
+    }
+
+    await CarWashTransaction.updateMany(
+      {
+        customer: customerId,
+        "service.id": serviceId,
+        redeemed: false,
+      },
+      {
+        $set: {
+          redeemed: true,
+        },
+      }
+    );
+
+    return successResponse(res, 200, "Customer streak reset successfully");
+  } catch (error) {
+    return errorResponse(res, 500, "Server error", error.message);
+  }
+};
 // ====================TRANSACTION=============================
 
 const getCarwashTransactions = async (req, res) => {
@@ -1425,4 +1451,5 @@ module.exports = {
   rollbackFromCompleted,
   editCarwashTransaction,
   getPreEditTransactionData,
+  resetCustomerStreak,
 };

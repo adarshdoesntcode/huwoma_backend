@@ -20,6 +20,12 @@ router
     carWashController.createCustomer
   );
 router
+  .route("/customer/resetstreak")
+  .put(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    carWashController.resetCustomerStreak
+  );
+router
   .route("/customers")
   .get(
     verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
