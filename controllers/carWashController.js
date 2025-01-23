@@ -89,6 +89,8 @@ const findCustomer = async (req, res) => {
         {
           $match: {
             vehicleNumber: { $regex: new RegExp(vehicleNumber, "i") },
+            transactionStatus: "Completed",
+            paymentStatus: "Paid",
           },
         },
         {
@@ -145,7 +147,6 @@ const findCustomer = async (req, res) => {
       customer
     );
   } catch (error) {
-    console.log("🚀 ~ findCustomer ~ error:", error);
     return errorResponse(res, 500, "Server error", error.message);
   }
 };
@@ -282,6 +283,8 @@ const resetCustomerStreak = async (req, res) => {
         customer: customerId,
         "service.id": serviceId,
         redeemed: false,
+        paymentStatus: "Paid",
+        transactionStatus: "Completed",
       },
       {
         $set: {
@@ -381,7 +384,6 @@ const getCarwashTransactions = async (req, res) => {
       transactions,
     });
   } catch (err) {
-    console.log(err);
     return errorResponse(res, 500, "Failed to retrieve transactions.");
   }
 };
@@ -867,7 +869,6 @@ const transactionThree = async (req, res) => {
     // );
 
     if (redeemed && washCount) {
-      console.log("🚀 ~ transactionThree ~ washCount:", washCount);
       const transactionsToUpdate = await CarWashTransaction.find(
         {
           customer: transaction.customer,
@@ -1430,6 +1431,50 @@ const editCarwashTransaction = async (req, res) => {
   }
 };
 
+const updateTransactionsWithVehicleDetails = async (req, res) => {
+  try {
+    const {
+      transactions,
+      customerId,
+      vehicleModel,
+      vehicleNumber,
+      vehicleColor,
+    } = req.body;
+
+    console.log({
+      transactions,
+      customerId,
+      vehicleModel,
+      vehicleNumber,
+      vehicleColor,
+    });
+    const filter = {
+      $and: [{ _id: { $in: transactions } }, { customer: customerId }],
+    };
+
+    const update = {
+      $set: {
+        vehicleModel,
+        vehicleNumber,
+        vehicleColor,
+      },
+    };
+
+    await CarWashTransaction.updateMany(filter, update);
+
+    await redis.del("carwash:transactions_today");
+
+    return successResponse(
+      res,
+      200,
+      "Transactions updated with vehicle details"
+    );
+  } catch (err) {
+    console.error(err);
+    return errorResponse(res, 500, "Server error");
+  }
+};
+
 module.exports = {
   getAllCustomers,
   createCustomer,
@@ -1452,4 +1497,5 @@ module.exports = {
   editCarwashTransaction,
   getPreEditTransactionData,
   resetCustomerStreak,
+  updateTransactionsWithVehicleDetails,
 };

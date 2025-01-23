@@ -26,6 +26,12 @@ router
     carWashController.resetCustomerStreak
   );
 router
+  .route("/customer/editvehicle")
+  .put(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    carWashController.updateTransactionsWithVehicleDetails
+  );
+router
   .route("/customers")
   .get(
     verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
