@@ -785,6 +785,8 @@ const transactionThree = async (req, res) => {
       netAmount,
       redeemed,
       washCount,
+      inspections,
+      origin,
     } = req.body;
 
     let parkingInDateObj = undefined;
@@ -830,9 +832,30 @@ const transactionThree = async (req, res) => {
     session = await mongoose.startSession();
     session.startTransaction();
 
-    const transaction = await CarWashTransaction.findByIdAndUpdate(
-      transactionId,
-      {
+    let payload;
+
+    if (origin === "queue") {
+      payload = {
+        transactionStatus,
+        paymentStatus,
+        paymentMode,
+        "service.cost": serviceCost,
+        "service.end": transactionTimeDateObj,
+        parking: {
+          in: parkingInDateObj,
+          out: parkingOutDateObj,
+          cost: parkingCost,
+        },
+        transactionTime: transactionTimeDateObj,
+        addOns,
+        grossAmount,
+        discountAmount,
+        netAmount,
+        inspections,
+        redeemed,
+      };
+    } else {
+      payload = {
         transactionStatus,
         paymentStatus,
         paymentMode,
@@ -848,7 +871,12 @@ const transactionThree = async (req, res) => {
         discountAmount,
         netAmount,
         redeemed,
-      },
+      };
+    }
+
+    const transaction = await CarWashTransaction.findByIdAndUpdate(
+      transactionId,
+      payload,
       { new: true, session }
     );
 
@@ -969,13 +997,30 @@ const getCheckoutDetails = async (req, res) => {
       );
     }
 
+    let inspectionTemplates = await redis.get("carwash:inspection");
+
+    if (!inspectionTemplates) {
+      inspectionTemplates = await InspectionTemplate.find().select(
+        "-__v -createdAt -updatedAt"
+      );
+
+      await redis.set(
+        "carwash:inspection",
+        JSON.stringify(inspectionTemplates),
+        "EX",
+        60 * 60 * 24
+      );
+    } else {
+      inspectionTemplates = JSON.parse(inspectionTemplates);
+    }
+
     return successResponse(
       res,
       200,
       "Checkout details retrieved successfully.",
       {
         customer,
-
+        inspectionTemplates,
         paymentModes,
       }
     );
