@@ -190,12 +190,12 @@ const updateSimracingCustomer = async (req, res) => {
 const getAvailableRigs = async (req, res) => {
   try {
     const pitStopRigs = await SimRacingRig.find({
-      rigStatus: "Pit Stop",
+      // rigStatus: "Pit Stop",
       rigOperational: true,
     });
 
     if (pitStopRigs.length === 0) {
-      return errorResponse(res, 204, "No pit stop rigs are available.");
+      return errorResponse(res, 204, "No rigs are available.");
     }
 
     return successResponse(
@@ -448,16 +448,16 @@ const raceStart = async (req, res) => {
       },
       { session: session }
     );
-
     await SimRacingRig.findByIdAndUpdate(
       rig,
       {
         $set: {
-          activeRacer: customer,
-          activeTransaction: simRacingTransaction._id,
           rigStatus: "On Track",
         },
-        // $push: { rigTransactions: simRacingTransaction._id },
+        $addToSet: {
+          activeRacer: customer,
+          activeTransaction: simRacingTransaction._id,
+        },
       },
       { session: session }
     );
@@ -485,6 +485,157 @@ const raceStart = async (req, res) => {
       res,
       500,
       "Server error. Failed to create a new Sim Racing transaction."
+    );
+  }
+};
+
+const pauseRace = async (req, res) => {
+  const { transactionId: id } = req.body;
+  try {
+    const transaction = await SimRacingTransaction.findById(id);
+    if (!transaction) {
+      return errorResponse(res, 404, "Transaction not found");
+    }
+
+    const now = new Date();
+    const pausedAt = new Date(now);
+
+    transaction.pauseHistory.push({ pausedAt });
+    transaction.transactionStatus = "Paused";
+    await transaction.save();
+
+    await redis.del("simracing:transactions_today");
+
+    return successResponse(
+      res,
+      200,
+      "Transaction paused successfully.",
+      transaction
+    );
+  } catch (error) {
+    console.error(error);
+    return errorResponse(
+      res,
+      500,
+      "Server error. Failed to pause transaction."
+    );
+  }
+};
+
+const resumeRace = async (req, res) => {
+  const { transactionId: id } = req.body;
+
+  try {
+    const transaction = await SimRacingTransaction.findById(id);
+    if (!transaction) {
+      return errorResponse(res, 404, "Transaction not found");
+    }
+
+    const now = new Date();
+    const resumedAt = new Date(now);
+    // Find the last pause entry and set the resumedAt timestamp
+    const lastPause =
+      transaction.pauseHistory[transaction.pauseHistory.length - 1];
+    if (lastPause && !lastPause.resumedAt) {
+      lastPause.resumedAt = resumedAt;
+      transaction.transactionStatus = "Active";
+      await transaction.save();
+    }
+
+    await redis.del("simracing:transactions_today");
+
+    return successResponse(
+      res,
+      200,
+      "Transaction resumed successfully",
+      transaction
+    );
+  } catch (error) {
+    return errorResponse(
+      res,
+      500,
+      "Server error. Failed to resume transaction",
+      error
+    );
+  }
+};
+
+const changeRig = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const { transactionId, newRigId, oldRigId } = req.body;
+    const transaction = await SimRacingTransaction.findByIdAndUpdate(
+      transactionId,
+      {
+        $set: {
+          rig: newRigId,
+        },
+      },
+      { session: session }
+    );
+    if (!transaction) {
+      await session.abortTransaction();
+      session.endSession();
+      return errorResponse(res, 404, "Transaction not found");
+    }
+
+    const rig = await SimRacingRig.findByIdAndUpdate(
+      oldRigId,
+      {
+        $pull: {
+          activeRacer: transaction.customer,
+          activeTransaction: transaction._id,
+        },
+      },
+      { new: true, session: session }
+    );
+
+    if (rig.activeTransaction.length === 0) {
+      await SimRacingRig.findByIdAndUpdate(
+        oldRigId,
+        {
+          $set: {
+            rigStatus: "Pit Stop",
+          },
+        },
+        { new: true, session }
+      );
+    }
+
+    await SimRacingRig.findByIdAndUpdate(
+      newRigId,
+      {
+        $set: {
+          rigStatus: "On Track",
+        },
+        $addToSet: {
+          activeRacer: transaction.customer,
+          activeTransaction: transaction._id,
+        },
+      },
+      { session: session }
+    );
+
+    await session.commitTransaction();
+    session.endSession();
+
+    await redis.del("simracing:transactions_today");
+
+    return successResponse(
+      res,
+      200,
+      "Transaction updated with new rig successfully.",
+      transaction
+    );
+  } catch (error) {
+    console.error(error);
+    await session.abortTransaction();
+    session.endSession();
+    return errorResponse(
+      res,
+      500,
+      "Server error. Failed to update transaction with new rig."
     );
   }
 };
@@ -569,11 +720,9 @@ const raceStartFromBooking = async (req, res) => {
       rig,
       {
         $set: {
-          activeRacer: customer,
-          activeTransaction: transaction._id,
           rigStatus: "On Track",
         },
-        // $push: { rigTransactions: transaction._id },
+        $push: { activeRacer: customer, activeTransaction: transaction._id },
       },
       { session }
     );
@@ -609,7 +758,7 @@ const getCheckoutDetails = async (req, res) => {
 
     const transaction = await SimRacingTransaction.findOne({
       _id: transactionId,
-      transactionStatus: "Active",
+      transactionStatus: { $in: ["Active", "Paused"] },
       paymentStatus: "Pending",
     })
       .populate({
@@ -682,7 +831,7 @@ const simracingCheckout = async (req, res) => {
     const transaction = await SimRacingTransaction.findOneAndUpdate(
       {
         _id: transactionId,
-        transactionStatus: "Active",
+        transactionStatus: { $in: ["Active", "Paused"] },
         paymentStatus: "Pending",
       },
       {
@@ -707,19 +856,28 @@ const simracingCheckout = async (req, res) => {
       return errorResponse(res, 404, "Transaction not found.");
     }
 
-    await SimRacingRig.findByIdAndUpdate(
+    const rig = await SimRacingRig.findByIdAndUpdate(
       transaction.rig,
       {
-        $unset: {
-          activeRacer: "",
-          activeTransaction: "",
-        },
-        $set: {
-          rigStatus: "Pit Stop",
+        $pull: {
+          activeRacer: transaction.customer,
+          activeTransaction: transaction._id,
         },
       },
-      { session }
+      { new: true, session }
     );
+
+    if (rig.activeTransaction.length === 0) {
+      await SimRacingRig.findByIdAndUpdate(
+        transaction.rig,
+        {
+          $set: {
+            rigStatus: "Pit Stop",
+          },
+        },
+        { new: true, session }
+      );
+    }
 
     // Uncomment the following lines if needed
     // await PaymentMode.findByIdAndUpdate(paymentMode, {
@@ -749,6 +907,7 @@ const simracingCheckout = async (req, res) => {
     );
   }
 };
+
 const cancelRace = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -758,7 +917,7 @@ const cancelRace = async (req, res) => {
     const transaction = await SimRacingTransaction.findOneAndUpdate(
       {
         _id: transactionId,
-        transactionStatus: { $in: ["Active", "Booked"] },
+        transactionStatus: { $in: ["Active", "Booked", "Paused"] },
         paymentStatus: "Pending",
       },
       {
@@ -777,19 +936,28 @@ const cancelRace = async (req, res) => {
       return errorResponse(res, 404, "Transaction not found.");
     }
 
-    await SimRacingRig.findByIdAndUpdate(
+    const rig = await SimRacingRig.findByIdAndUpdate(
       transaction.rig,
       {
-        $unset: {
-          activeRacer: "",
-          activeTransaction: "",
-        },
-        $set: {
-          rigStatus: "Pit Stop",
+        $pull: {
+          activeRacer: transaction.customer,
+          activeTransaction: transaction._id,
         },
       },
-      { session }
+      { new: true, session }
     );
+
+    if (rig.activeTransaction.length === 0) {
+      await SimRacingRig.findByIdAndUpdate(
+        transaction.rig,
+        {
+          $set: {
+            rigStatus: "Pit Stop",
+          },
+        },
+        { new: true, session }
+      );
+    }
 
     await redis.del("simracing:transactions_today");
 
@@ -1010,6 +1178,7 @@ const rollbackFromCompleted = async (req, res) => {
 const clientStartRace = async (req, res) => {
   try {
     const { coordinates } = req.body;
+    console.log("🚀 ~ clientStartRace ~ coordinates:", coordinates);
 
     new SystemActivity({
       description: `QR code scanned from ${coordinates.longitude}, ${coordinates.latitude}`,
@@ -1057,9 +1226,9 @@ const clientStartRace = async (req, res) => {
       if (!rig) {
         return errorResponse(res, 404, "Rig not found");
       }
-      if (rig.rigStatus === "On Track") {
-        return errorResponse(res, 400, "This Rig is currently not available.");
-      }
+      // if (rig.rigStatus === "On Track") {
+      //   return errorResponse(res, 400, "This Rig is currently not available.");
+      // }
       return successResponse(res, 200, "RTR", rig);
     } else {
       const token = key.split(" ")[1];
@@ -1074,14 +1243,14 @@ const clientStartRace = async (req, res) => {
       }
 
       if (
-        rig.activeRacer?.toString() === decoded.customerId?.toString() &&
-        rig.activeTransaction?.toString() === decoded.transactionId?.toString()
+        rig.activeRacer?.includes(decoded.customerId?.toString()) &&
+        rig.activeTransaction?.includes(decoded.transactionId?.toString())
       ) {
         return successResponse(res, 200, "CTR");
       }
-      if (rig.rigStatus === "On Track") {
-        return errorResponse(res, 400, "This Rig is currently not available.");
-      }
+      // if (rig.rigStatus === "On Track") {
+      //   return errorResponse(res, 400, "This Rig is currently not available.");
+      // }
       return successResponse(res, 200, "RTR", rig);
     }
   } catch (error) {
@@ -1098,7 +1267,8 @@ const startRaceFromClient = async (req, res) => {
     try {
       const rig = await SimRacingRig.findOne({
         _id: rigId,
-        rigStatus: "Pit Stop",
+        rigOperational: true,
+        // rigStatus: "Pit Stop",
       }).session(session);
       if (!rig) {
         await session.abortTransaction();
@@ -1176,11 +1346,12 @@ const startRaceFromClient = async (req, res) => {
         rigId,
         {
           $set: {
-            activeRacer: customer._id,
-            activeTransaction: simRacingTransaction._id,
             rigStatus: "On Track",
           },
-          // $push: { rigTransactions: simRacingTransaction._id },
+          $push: {
+            activeRacer: customer._id,
+            activeTransaction: simRacingTransaction._id,
+          },
         },
         { session: session }
       );
@@ -1255,8 +1426,8 @@ const getTransactionForClient = async (req, res) => {
 
     const transaction = await SimRacingTransaction.findOne({
       _id: decoded.transactionId,
-      customer: decoded.customerId,
-      rig: decoded.rigId,
+      // customer: decoded.customerId,
+      // rig: decoded.rigId,
     })
       .populate("rig")
       .populate("customer");
@@ -1287,6 +1458,8 @@ module.exports = {
   getSimracingTransactions,
   getAvailableRigs,
   raceStart,
+  pauseRace,
+  resumeRace,
   deleteTransaction,
   cancelRace,
   createNewBookingTransaction,
@@ -1301,4 +1474,5 @@ module.exports = {
   updateSimracingCustomer,
   getFilteredSimRacingTransactions,
   rollbackFromCompleted,
+  changeRig,
 };

@@ -55,6 +55,24 @@ router
     verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
     simRacingController.raceStart
   );
+router
+  .route("/transaction/pause")
+  .post(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    simRacingController.pauseRace
+  );
+router
+  .route("/transaction/resume")
+  .post(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    simRacingController.resumeRace
+  );
+router
+  .route("/transaction/changerig")
+  .put(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    simRacingController.changeRig
+  );
 
 router
   .route("/transaction/rollback")

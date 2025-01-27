@@ -16,20 +16,18 @@ const SimRacingRigSchema = new Schema(
       type: Boolean,
       default: true,
     },
-    activeRacer: {
-      type: Schema.Types.ObjectId,
-      ref: "SimRacingCustomer",
-    },
-    activeTransaction: {
-      type: Schema.Types.ObjectId,
-      ref: "SimRacingTransaction",
-    },
-    // rigTransactions: [
-    //   {
-    //     type: Schema.Types.ObjectId,
-    //     ref: "SimRacingTransaction",
-    //   },
-    // ],
+    activeRacer: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "SimRacingCustomer",
+      },
+    ],
+    activeTransaction: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "SimRacingTransaction",
+      },
+    ],
   },
   {
     timestamps: true,

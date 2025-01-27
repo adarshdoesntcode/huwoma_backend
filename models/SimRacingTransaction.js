@@ -18,9 +18,15 @@ const SimRacingTransactionSchema = new Schema(
     end: {
       type: Date,
     },
+    pauseHistory: [
+      {
+        pausedAt: { type: Date },
+        resumedAt: { type: Date },
+      },
+    ],
     transactionStatus: {
       type: String,
-      enum: ["Active", "Completed", "Cancelled", "Booked"],
+      enum: ["Active", "Paused", "Completed", "Cancelled", "Booked"],
       default: "Active",
     },
     paymentStatus: {
