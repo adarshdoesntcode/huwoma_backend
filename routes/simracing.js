@@ -73,6 +73,18 @@ router
     verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
     simRacingController.changeRig
   );
+router
+  .route("/transaction/preedit")
+  .get(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    simRacingController.getPreEditTransactionData
+  );
+router
+  .route("/transaction/edit")
+  .put(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    simRacingController.editSimracingTransaction
+  );
 
 router
   .route("/transaction/rollback")

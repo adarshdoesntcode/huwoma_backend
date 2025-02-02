@@ -62,6 +62,12 @@ router
     verifyRoles(ROLES_LIST.superAdmin),
     carWashController.getPostFilterTransactions
   );
+router
+  .route("/transaction/old-record")
+  .post(
+    verifyRoles(ROLES_LIST.superAdmin, ROLES_LIST.admin),
+    carWashController.createOldCarwashTransaction
+  );
 
 router
   .route("/transaction/edit")

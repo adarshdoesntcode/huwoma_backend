@@ -483,7 +483,7 @@ const transactionStartFromBooking = async (req, res) => {
       vehicleModel,
       vehicleColor,
       customer,
-      // serviceStart,
+      addOns,
       serviceRate,
       actualRate,
       hour,
@@ -549,6 +549,7 @@ const transactionStartFromBooking = async (req, res) => {
           cost: serviceRate,
           actualRate,
         },
+        addOns,
         $unset: { deleteAt: "" },
         vehicleNumber: vehicleNumber,
         vehicleModel: vehicleModel,
@@ -556,7 +557,6 @@ const transactionStartFromBooking = async (req, res) => {
       },
       {
         new: true,
-        runValidators: true,
       }
     ).session(session);
     if (!transaction) {
@@ -605,6 +605,7 @@ const transactionOne = async (req, res) => {
       vehicleColor,
       vehicleModel,
       customer,
+      addOns,
       actualRate,
       serviceRate,
       hour,
@@ -679,6 +680,7 @@ const transactionOne = async (req, res) => {
         cost: serviceRate,
         actualRate,
       },
+      addOns,
       billNo,
       vehicleNumber: vehicleNumber,
       vehicleModel: vehicleModel,
@@ -944,6 +946,144 @@ const transactionThree = async (req, res) => {
     }
     console.error(err);
     return errorResponse(res, 500, "Failed to update transaction.");
+  }
+};
+
+const createOldCarwashTransaction = async (req, res) => {
+  const {
+    customerName,
+    customerContact,
+    transactionStatus,
+    paymentStatus,
+    service,
+    serviceStart,
+    serviceEnd,
+    serviceCost,
+    parkingIn,
+    parkingOut,
+    parkingCost,
+    vehicleModel,
+    vehicleNumber,
+    vehicleColor,
+    addOns,
+    grossAmount,
+    discountAmount,
+    paymentMode,
+    transactionTime,
+    netAmount,
+    redeemed,
+  } = req.body;
+
+  let session;
+
+  try {
+    session = await mongoose.startSession();
+    session.startTransaction();
+
+    let customer = await CarWashCustomer.findOne({ customerContact }).session(
+      session
+    );
+    if (!customer) {
+      customer = await CarWashCustomer.create({
+        customerName,
+        customerContact,
+      });
+    }
+
+    const serviceStartDateObj = serviceStart
+      ? new Date(serviceStart)
+      : undefined;
+    const serviceEndDateObj = serviceEnd ? new Date(serviceEnd) : undefined;
+    const parkingInDateObj = parkingIn ? new Date(parkingIn) : undefined;
+    const parkingOutDateObj = parkingOut ? new Date(parkingOut) : undefined;
+    const transactionTimeDateObj = transactionTime
+      ? new Date(transactionTime)
+      : undefined;
+
+    const clientDate = serviceStartDateObj.toISOString();
+
+    let billNo;
+    let existingBillNo;
+
+    if (!billNo) {
+      do {
+        billNo = generateBillNo(clientDate);
+        existingBillNo = await CarWashTransaction.findOne({ billNo }).session(
+          session
+        );
+      } while (existingBillNo);
+    }
+
+    const newTransaction = await CarWashTransaction.create({
+      billNo,
+      customer: customer._id,
+      transactionStatus,
+      paymentStatus,
+      createdAt: serviceStartDateObj,
+      service: {
+        id: service,
+        start: serviceStartDateObj,
+        end: serviceEndDateObj,
+        cost: serviceCost,
+        actualRate: serviceCost,
+      },
+      parking: {
+        in: parkingInDateObj,
+        out: parkingOutDateObj,
+        cost: parkingCost,
+      },
+      vehicleModel,
+      vehicleNumber,
+      vehicleColor,
+      addOns,
+      grossAmount,
+      discountAmount,
+      paymentMode,
+      transactionTime: transactionTimeDateObj,
+      netAmount,
+      redeemed,
+    });
+
+    await CarWashCustomer.findByIdAndUpdate(
+      customer._id,
+      {
+        $addToSet: {
+          customerTransactions: newTransaction._id,
+        },
+      },
+      {
+        new: true,
+        session,
+      }
+    );
+
+    await redis.del("carwash:transactions_today");
+
+    await SystemActivity.create({
+      description: `Transaction created for customer ${customer.customerName}`,
+      activityType: "Create",
+      systemModule: "Carwash Transaction",
+      activityBy: req.userId,
+      activityIpAddress: req.ip,
+      userAgent: req.headers["user-agent"],
+    });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return successResponse(
+      res,
+      200,
+      "Transaction created successfully.",
+      newTransaction
+    );
+  } catch (err) {
+    console.error(err);
+    if (session) {
+      await session.abortTransaction();
+      session.endSession();
+    }
+    return errorResponse(res, 500, "Failed to create transaction.");
   }
 };
 
@@ -1543,4 +1683,5 @@ module.exports = {
   getPreEditTransactionData,
   resetCustomerStreak,
   updateTransactionsWithVehicleDetails,
+  createOldCarwashTransaction,
 };

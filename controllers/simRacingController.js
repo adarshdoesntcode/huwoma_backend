@@ -1173,6 +1173,58 @@ const rollbackFromCompleted = async (req, res) => {
   }
 };
 
+const getPreEditTransactionData = async (req, res) => {
+  try {
+    const rigs = await SimRacingRig.find({
+      rigOperational: true,
+    });
+
+    const paymentModes = await PaymentMode.find({
+      paymentModeOperational: true,
+    });
+
+    return successResponse(res, 200, "Success", {
+      rigs,
+      paymentModes,
+    });
+  } catch (err) {
+    return errorResponse(res, 500, "Server error. Failed to get transaction");
+  }
+};
+
+const editSimracingTransaction = async (req, res) => {
+  try {
+    const { transactionId, rigId, paymentMode } = req.body;
+
+    const transaction = await SimRacingTransaction.findOneAndUpdate(
+      {
+        _id: transactionId,
+        transactionStatus: { $in: ["Completed"] },
+        paymentStatus: "Paid",
+      },
+      {
+        rig: rigId,
+        paymentMode,
+      },
+      { new: true }
+    );
+
+    if (!transaction) {
+      return errorResponse(res, 404, "Transaction not found");
+    }
+
+    await redis.del("simracing:transactions_today");
+
+    return successResponse(res, 200, "Transaction updated", transaction);
+  } catch (err) {
+    return errorResponse(
+      res,
+      500,
+      "Server error. Failed to update transaction"
+    );
+  }
+};
+
 // ========================RACER UI=============================
 
 const clientStartRace = async (req, res) => {
@@ -1475,4 +1527,6 @@ module.exports = {
   getFilteredSimRacingTransactions,
   rollbackFromCompleted,
   changeRig,
+  getPreEditTransactionData,
+  editSimracingTransaction,
 };
